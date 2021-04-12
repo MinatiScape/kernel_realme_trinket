@@ -87,13 +87,7 @@ extern char modem_wakeup_src_string[MODEM_WAKEUP_SRC_NUM][10];
 
 extern u64 wakeup_source_count_wifi ;
 #endif /*VENDOR_EDIT*/
-/* VENDOR_EDIT */
 
-#ifdef VENDOR_EDIT
-//Lei.Zhang@PSW.CN.WiFi.Hardware.1501794, 2019/03/02
-//Add irq of WiFi for SDM710
-static char WLAN_DATA_IRQ_NAME[]=     			"WLAN"; 		     //eg:WLAN_CE_0 ~WLAN_CE_11
-#endif /*VENDOR_EDIT*/
 
 struct redist_region {
 	void __iomem		*redist_base;
@@ -515,24 +509,9 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 		else if (desc->action && desc->action->name)
 			name = desc->action->name;
 
-        #ifndef VENDOR_EDIT
-        pr_warn("%s: %d triggered %s\n", __func__, irq, name);
-        #else
-        if(name != NULL)
-        {
-            pr_warn("%s: %d triggered %s\n", __func__, irq, name);
+		pr_warn("%s: %d triggered %s\n", __func__, irq, name);
 
-            #ifdef VENDOR_EDIT
-            //Lei.Zhang@PSW.CN.WiFi.Hardware.1501794, 2019/03/02
-            //Add irq of WiFi for SDM710
-            if(strncmp(name, WLAN_DATA_IRQ_NAME, sizeof(WLAN_DATA_IRQ_NAME)-1) == 0)
-            {
-                wakeup_source_count_wifi++;
-            }
-            #endif //VENDOR_EDIT
-        }
-        #endif
-                #ifdef VENDOR_EDIT
+		#ifdef VENDOR_EDIT
 		//liuhd@PSW.CN.WiFi.Hardware.1202765,2017/12/10,add for the irq of wlan when system wakeuped by wlan
 			if((irq  >= WAKEUP_SOURCE_WIFI_1ST && irq  <= WAKEUP_SOURCE_WIFI_2ND) ||
 				(irq  >= WAKEUP_SOURCE_WIFI_3RD && irq  <= WAKEUP_SOURCE_WIFI_4TH)) {
@@ -547,6 +526,26 @@ static void gic_show_resume_irq(struct gic_chip_data *gic)
 			 	#endif
 			}
 		#endif //VENDOR_EDIT
+
+		#ifdef VENDOR_EDIT
+		//Yongyao.Song@PSW.NW.PWR.919039, 2017/01/20,add for modem wake up source
+			if ((WAKEUP_SOURCE_MODEM == irq ) || (WAKEUP_SOURCE_MODEM_IPA == irq))
+			{
+				wakeup_source_count_modem++;
+				if(WAKEUP_SOURCE_MODEM == irq)
+				{
+					modem_wakeup_src_count[MODEM_QMI_WS_INDEX]++;
+				}else if (WAKEUP_SOURCE_MODEM_IPA == irq) {
+					modem_wakeup_src_count[MODEM_IPA_WS_INDEX]++;
+					#ifdef VENDOR_EDIT
+					//Jiemin.Zhu@Swdp.Performance.Power, 2016/05/12, add for modem wake up source
+				 	// modem_wakeup_source = 0;
+					//schedule_work(&wakeup_reason_work);
+					#endif
+				}
+			}
+		//Yongyao.Song add end
+		#endif /*VENDOR_EDIT*/
 
 		#ifdef VENDOR_EDIT
 		//Nanwei.Deng@BSP.Power.Basic, 2018/04/28, add for analysis power coumption.

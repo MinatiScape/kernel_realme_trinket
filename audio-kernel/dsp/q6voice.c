@@ -58,6 +58,7 @@ struct cvd_version_table cvd_version_table_mapping[CVD_INT_VERSION_MAX] = {
 		{CVD_VERSION_2_1, CVD_INT_VERSION_2_1},
 		{CVD_VERSION_2_2, CVD_INT_VERSION_2_2},
 		{CVD_VERSION_2_3, CVD_INT_VERSION_2_3},
+		{CVD_VERSION_2_4, CVD_INT_VERSION_2_4},
 };
 
 static struct common_data common;
@@ -1275,7 +1276,6 @@ static int voice_unmap_cal_block(struct voice_data *v, int cal_index)
 		goto unlock;
 	}
 
-	mutex_lock(&common.common_lock);
 	result = voice_send_mvm_unmap_memory_physical_cmd(
 		v, cal_block->map_data.q6map_handle);
 	if (result)
@@ -1283,7 +1283,6 @@ static int voice_unmap_cal_block(struct voice_data *v, int cal_index)
 			__func__, v->session_id, result);
 
 	cal_block->map_data.q6map_handle = 0;
-	mutex_unlock(&common.common_lock);
 unlock:
 	mutex_unlock(&common.cal_data[cal_index]->lock);
 done:
@@ -6869,12 +6868,11 @@ int voc_end_voice_call(uint32_t session_id)
 
 		voice_destroy_mvm_cvs_session(v);
 
-		 /* Fix me
-		  * ret = voice_mhi_end();
-		  * if (ret < 0)
-		  *	pr_debug("%s: voice_mhi_end failed! %d\n",
-		  *		 __func__, ret);
-		  */
+		ret = voice_mhi_end();
+		if (ret < 0)
+			pr_debug("%s: voice_mhi_end failed! %d\n",
+				 __func__, ret);
+
 		v->voc_state = VOC_RELEASE;
 	} else {
 		pr_err("%s: Error: End voice called in state %d\n",
@@ -7209,14 +7207,13 @@ int voc_start_voice_call(uint32_t session_id)
 				pr_debug("%s: Error retrieving CVD version %d\n",
 					 __func__, ret);
 		}
-		 /* Fix me
-		  * ret = voice_mhi_start();
-		  * if (ret < 0) {
-		  *	pr_debug("%s: voice_mhi_start failed! %d\n",
-		  *		 __func__, ret);
-		  *	goto fail;
-		  * }
-		  */
+
+		ret = voice_mhi_start();
+		if (ret < 0) {
+			pr_debug("%s: voice_mhi_start failed! %d\n",
+				 __func__, ret);
+			goto fail;
+		}
 
 		ret = voice_create_mvm_cvs_session(v);
 		if (ret < 0) {

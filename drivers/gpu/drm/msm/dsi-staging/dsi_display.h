@@ -618,6 +618,16 @@ void dsi_display_enable_event(struct drm_connector *connector,
 int dsi_display_set_backlight(struct drm_connector *connector,
 		void *display, u32 bl_lvl);
 
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/9, add CABC cmd used for power saving
+int dsi_display_set_cabc_mode(struct drm_connector *connector,
+		void *display, u32 cabc_mode);
+
+int dsi_display_get_cabc_mode(struct drm_connector *connector,
+		void *display, unsigned int *cabc_mode);
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/9, add CABC cmd used for power saving
+//#endif /* ODM_WT_EDIT */
+
 /**
  * dsi_display_check_status() - check if panel is dead or alive
  * @connector:          Pointer to drm connector structure

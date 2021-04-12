@@ -696,7 +696,8 @@
 
 &pmi632_qg {
 	qcom,battery-data = <&mtp_batterydata>;
-	qcom,qg-iterm-ma = <300>;
+	/* Bin2.Zhang@ODM_WT.BSP.Charger.Basic, 2020-09-10, Modified for reduce max Vce */
+	qcom,qg-iterm-ma = <320>;
 	qcom,hold-soc-while-full;
 	qcom,linearize-soc;
 	qcom,qg-use-s7-ocv;

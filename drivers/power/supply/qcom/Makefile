@@ -3,12 +3,12 @@ obj-$(CONFIG_QPNP_FG_GEN4)     += qpnp-fg-gen4.o fg-memif.o fg-util.o fg-alg.o  
 #ifdef VENDOR_EDIT
 #/* shanliangliang@CHG.BSP.charge, 2020/03/06, Add for oppo_gauge */
 $(warning simon $(SHIPPING_API_LEVEL))
-ifeq ($(SHIPPING_API_LEVEL), 28)
+##ifeq ($(SHIPPING_API_LEVEL), 28)
 obj-$(CONFIG_OPPO_QPNP_QG)     += qpnp-qg.o pmic-voter.o qg-util.o qg-soc.o qg-sdam.o qg-battery-profile.o qg-profile-lib.o fg-alg.o
-else
+##else
 #/* wangchao@ODM.BSP.charge, 2019/12/6, Add for oppo_gauge */
-obj-$(CONFIG_OPPO_QPNP_QG)     += oppo_qpnp_qg.o pmic-voter.o qg-soc.o qg-sdam.o qg-battery-profile.o qg-profile-lib.o fg-alg.o
-endif
+##obj-$(CONFIG_OPPO_QPNP_QG)     += oppo_qpnp_qg.o pmic-voter.o qg-soc.o qg-sdam.o qg-battery-profile.o qg-profile-lib.o fg-alg.o
+##endif
 #endif
 obj-$(CONFIG_SMB1351_USB_CHARGER) += smb1351-charger.o pmic-voter.o battery.o
 obj-$(CONFIG_SMB1355_SLAVE_CHARGER)   += smb1355-charger.o pmic-voter.o

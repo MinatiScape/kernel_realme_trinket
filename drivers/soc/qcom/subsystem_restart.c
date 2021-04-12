@@ -287,7 +287,7 @@ static ssize_t restart_level_store(struct device *dev,
 		if (!strncasecmp(buf, restart_levels[i], count)) {
 			pil_ipc("[%s]: change restart level to %d\n",
 				subsys->desc->name, i);
-			subsys->restart_level = 1;
+			subsys->restart_level = i;
 			return orig_count;
 		}
 	return -EPERM;
@@ -896,26 +896,6 @@ int restart_sensor_subsys(void)
 }
 EXPORT_SYMBOL(restart_sensor_subsys);
 #endif
-
-#ifdef VENDOR_EDIT
-/* Fuchun.Liao@BSP.CHG.Basic 2018/11/27 modify for rf cable detect */
-int op_restart_modem(void)
-{
-	struct subsys_device *subsys = find_subsys_device("modem");
-	int restart_level;
-
-	if (!subsys)
-		return -ENODEV;
-	pr_err("%s\n", __func__);
-	restart_level = subsys->restart_level;
-	subsys->restart_level = RESET_SUBSYS_COUPLED;
-	if (subsystem_restart("modem") == -ENODEV)
-		pr_err("%s: SSR call modem failed\n", __func__);
-	subsys->restart_level = restart_level;
-	return 0;
-}
-EXPORT_SYMBOL(op_restart_modem);
-#endif /* VENDOR_EDIT */
 
 static int subsys_start(struct subsys_device *subsys)
 {
@@ -1892,7 +1872,7 @@ struct subsys_device *subsys_register(struct subsys_desc *desc)
 	/* YiXue.Ge@PSW.BSP.Kernel.Driver,2017/05/15,
 	 * Add for init subsyst restart level as RESET_SUBSYS_COUPLED at mp build
 	 */
-	//if (!oppo_daily_build())
+	if (!oppo_daily_build())
 		subsys->restart_level = RESET_SUBSYS_COUPLED;
 #endif
 

@@ -809,11 +809,7 @@ int sde_connector_update_hbm(struct drm_connector *connector)
 	}
 
 	if (fingerprint_mode != dsi_display->panel->is_hbm_enabled) {
-		struct drm_crtc *crtc = c_conn->encoder->crtc;
 		struct dsi_panel *panel = dsi_display->panel;
-		int vblank = 0;
-		u32 target_vblank, current_vblank;
-		int ret;
 
 		if (oppo_fod_on_vblank >= 0)
 			panel->cur_mode->priv_info->fod_on_vblank = oppo_fod_on_vblank;
@@ -831,32 +827,7 @@ int sde_connector_update_hbm(struct drm_connector *connector)
 
 			    if (OPPO_DISPLAY_AOD_SCENE != get_oppo_display_scene() &&
 			        dsi_display->panel->bl_config.bl_level) {
-				    if (dsi_display->config.panel_mode != DSI_OP_VIDEO_MODE) {
-				    current_vblank = drm_crtc_vblank_count(crtc);
-				    ret = wait_event_timeout(*drm_crtc_vblank_waitqueue(crtc),
-						    current_vblank != drm_crtc_vblank_count(crtc),
-						    msecs_to_jiffies(17));
-				    }
-
-				    vblank = panel->cur_mode->priv_info->fod_on_vblank;
-
-				    dsi_display_clk_ctrl(dsi_display->dsi_clk_handle,
-						         DSI_CORE_CLK, DSI_CLK_ON);
-
-				    target_vblank = drm_crtc_vblank_count(crtc) + vblank;
 				    rc = dsi_panel_tx_cmd_set(dsi_display->panel, DSI_CMD_AOD_HBM_ON);
-
-				    dsi_display_clk_ctrl(dsi_display->dsi_clk_handle,
-						         DSI_CORE_CLK, DSI_CLK_OFF);
-				    if (vblank) {
-					    ret = wait_event_timeout(*drm_crtc_vblank_waitqueue(crtc),
-							    target_vblank == drm_crtc_vblank_count(crtc),
-							    msecs_to_jiffies((vblank + 1) * 17 ));
-					    if (!ret) {
-						    pr_err("OnscreenFingerprint failed to wait vblank timeout target_vblank=%d current_vblank=%d\n",
-							    target_vblank, drm_crtc_vblank_count(crtc));
-					    }
-				    }
 			    } else {
 				    dsi_display_clk_ctrl(dsi_display->dsi_clk_handle,
 						         DSI_CORE_CLK, DSI_CLK_ON);
@@ -874,14 +845,6 @@ int sde_connector_update_hbm(struct drm_connector *connector)
 		} else {
 
 			mutex_lock(&dsi_display->panel->panel_lock);
-
-			current_vblank = drm_crtc_vblank_count(crtc);
-			ret = wait_event_timeout(*drm_crtc_vblank_waitqueue(crtc),
-					current_vblank == drm_crtc_vblank_count(crtc),
-					msecs_to_jiffies(17));
-
-			vblank = panel->cur_mode->priv_info->fod_off_vblank;
-			target_vblank = drm_crtc_vblank_count(crtc) + vblank;
 
 			dsi_display_clk_ctrl(dsi_display->dsi_clk_handle,
 					     DSI_CORE_CLK, DSI_CLK_ON);
@@ -915,25 +878,6 @@ int sde_connector_update_hbm(struct drm_connector *connector)
 				return rc;
 			}
 			_sde_connector_update_bl_scale(c_conn);
-
-			if (vblank) {
-				ret = wait_event_timeout(*drm_crtc_vblank_waitqueue(crtc),
-						target_vblank == drm_crtc_vblank_count(crtc),
-						msecs_to_jiffies((vblank + 1) * 17 ));
-				if (!ret) {
-					pr_err("OnscreenFingerprint failed to wait vblank timeout target_vblank=%d current_vblank=%d\n",
-							target_vblank, drm_crtc_vblank_count(crtc));
-				}
-			}
-		}
-	}
-
-	if (oppo_dimlayer_hbm_vblank_count > 0) {
-		oppo_dimlayer_hbm_vblank_count--;
-	} else {
-		while (atomic_read(&oppo_dimlayer_hbm_vblank_ref) > 0) {
-			drm_crtc_vblank_put(connector->state->crtc);
-			atomic_dec(&oppo_dimlayer_hbm_vblank_ref);
 		}
 	}
 

@@ -1893,7 +1893,6 @@ int oppo_get_panel_brightness(void)
 	return display->panel->bl_config.bl_level;
 }
 
-extern bool oppo_ffl_trigger_finish;
 int oppo_get_panel_brightness_to_alpha(void)
 {
 	struct dsi_display *display = get_main_display();
@@ -1905,9 +1904,6 @@ int oppo_get_panel_brightness_to_alpha(void)
 
 	if (hbm_mode)
 		return 0;
-
-	if (!oppo_ffl_trigger_finish)
-		return brightness_to_alpha(FFL_FP_LEVEL);
 
 	return brightness_to_alpha(display->panel->bl_config.bl_level);
 }
@@ -2159,7 +2155,47 @@ static ssize_t oppo_display_notify_panel_blank(struct device *dev,
 	}
 	return count;
 }
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/09, add CABC api used for power saving
+#ifdef VENDOR_EDIT
+/* Jinzhu.Han@RM.MM.DISPLAY.FEATURE,2019.05.11 Add for cabc attribute*/
+static ssize_t oppo_display_set_cabc(struct device *dev,
+		struct device_attribute *attr,
+		const char *buf, size_t count)
+{
+    int cabc_mode = 0;
+    struct dsi_display * dsi_display = NULL;
 
+    sscanf(buf, "%du", &cabc_mode);
+    printk(KERN_INFO "%s oppo_display_set_cabc = %d\n", __func__, cabc_mode);
+    if(get_oppo_display_power_status() == OPPO_DISPLAY_POWER_ON) {
+        dsi_display = get_main_display();
+        if(dsi_display == NULL) {
+            printk(KERN_INFO "oppo_display_set_seed and main display is null");
+            return count;
+        }
+    (void)dsi_display_set_cabc_mode(NULL, dsi_display, cabc_mode);
+    }
+    return count;
+}
+
+static ssize_t oppo_display_get_cabc(struct device *dev,
+        struct device_attribute *attr, char *buf)
+{
+    int cabc_mode = 0;
+    struct dsi_display * dsi_display = get_main_display();
+    if(dsi_display == NULL) {
+        printk(KERN_INFO "oppo_display_set_cabc and main display is null");
+        return -EINVAL;
+    }
+
+    (void)dsi_display_get_cabc_mode(NULL, dsi_display, &cabc_mode);
+    printk(KERN_INFO "oppo_display_get_cabc = %d\n",cabc_mode);
+    return sprintf(buf, "%d\n", cabc_mode);
+}
+#endif
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add CABC api used for power saving
+//#endif /* ODM_WT_EDIT */
 
 #define FFL_LEVEL_START 2
 #define FFL_LEVEL_END  236
@@ -2172,13 +2208,7 @@ static ssize_t oppo_display_notify_panel_blank(struct device *dev,
 #define FFL_TRIGGLE_CONTROL 1
 #define FFL_EXIT_FULLY_CONTROL 2
 
-bool ffl_work_running = false;
-bool oppo_ffl_trigger_finish = true;
 static int is_ffl_enable = FFL_EXIT_CONTROL;
-struct task_struct *oppo_ffl_thread;
-struct kthread_worker oppo_ffl_worker;
-struct kthread_work oppo_ffl_work;
-static DEFINE_MUTEX(oppo_ffl_lock);
 
 static ssize_t oppo_get_ffl_setting(struct device *dev,
 		struct device_attribute *attr, char *buf)
@@ -2193,165 +2223,11 @@ static ssize_t oppo_set_ffl_setting(struct device *dev,
 		const char *buf, size_t count)
 {
 	int enable = 0;
-	unsigned char payload[32] = "";
 
 	sscanf(buf, "%du", &enable);
 	printk(KERN_INFO "%s oppo_set_ffl_setting = %d\n", __func__, enable);
 
-	mutex_lock(&oppo_ffl_lock);
-
-	if(enable != is_ffl_enable) {
-		pr_debug("set_ffl_setting need change is_ffl_enable\n");
-		is_ffl_enable = enable;
-		if ((is_ffl_enable ==FFL_TRIGGLE_CONTROL) && ffl_work_running){
-			oppo_ffl_trigger_finish = false;
-			kthread_queue_work(&oppo_ffl_worker, &oppo_ffl_work);
-		}
-	}
-
-	mutex_unlock(&oppo_ffl_lock);
-
-	if ((is_ffl_enable ==FFL_TRIGGLE_CONTROL) && ffl_work_running) {
-		scnprintf(payload, sizeof(payload), "EventID@@%d$$fflset@@%d",OPPO_MM_DIRVER_FB_EVENT_ID_FFLSET,enable);
-		upload_mm_kevent_fb_data(OPPO_MM_DIRVER_FB_EVENT_MODULE_DISPLAY,payload);
-	}
-
 	return count;
-}
-
-static void oppo_ffl_setting_thread(struct kthread_work *work)
-{
-	struct dsi_display *display = get_main_display();
-	int index =0;
-	int pending =0;
-	int ffluprate = FFLUPRARE;
-	int fflbackrate = BACKUPRATE;
-	int ffllevelstart = FFL_LEVEL_START;
-	int ffllevelend = FFL_LEVEL_END;
-	int system_backlight_target;
-	int rc;
-
-	if (get_oppo_display_power_status() == OPPO_DISPLAY_POWER_OFF)
-		return;
-
-	if (is_ffl_enable != FFL_TRIGGLE_CONTROL)
-		return;
-
-	if (!display || !display->panel) {
-		pr_err("failed to find display panel \n");
-		return;
-	}
-
-	if (!ffl_work_running)
-		return;
-
-	if (is_brandon()) {
-		ffluprate = 20;
-		fflbackrate = 30;
-		ffllevelstart = 19;
-		ffllevelend = 1200;
-	}
-
-	if (is_ktd3136 == 1) {
-		ffluprate = KTDUPRATE;
-		fflbackrate = KTDBACKRATE;
-	}
-
-	rc = dsi_display_clk_ctrl(display->dsi_clk_handle,
-			DSI_CORE_CLK, DSI_CLK_ON);
-	if (rc) {
-		pr_err("[%s] failed to enable DSI core clocks, rc=%d\n",
-				display->name, rc);
-		return;
-	}
-
-	for(index = ffllevelstart;index < ffllevelend;index = index + ffluprate ) {
-		if((is_ffl_enable ==FFL_EXIT_CONTROL) ||
-		   (is_ffl_enable ==FFL_EXIT_FULLY_CONTROL) ||
-		   !ffl_work_running)
-			break;
-		/*
-		 * On Onscreenfingerprint mode, max backlight level should be FFL_FP_LEVEL
-		 */
-		if (display->panel->is_hbm_enabled && index > FFL_FP_LEVEL)
-			break;
-
-		mutex_lock(&display->panel->panel_lock);
-		dsi_panel_set_backlight(display->panel, index);
-		mutex_unlock(&display->panel->panel_lock);
-		usleep_range(1000, 1100);
-	}
-
-	for(pending =0; pending <= FFL_PENDING_END; pending++)
-	{
-		if((is_ffl_enable ==FFL_EXIT_CONTROL) ||
-		   (is_ffl_enable ==FFL_EXIT_FULLY_CONTROL) ||
-		   !ffl_work_running)
-			break;
-		usleep_range(8000, 8100);
-	}
-
-	system_backlight_target = display->panel->bl_config.bl_level;
-
-	if(index < system_backlight_target) {
-		for(index; index < system_backlight_target; index =index + fflbackrate) {
-			if((is_ffl_enable ==FFL_EXIT_FULLY_CONTROL) ||
-			   !ffl_work_running)
-				break;
-			mutex_lock(&display->panel->panel_lock);
-			dsi_panel_set_backlight(display->panel, index);
-			mutex_unlock(&display->panel->panel_lock);
-			usleep_range(6000, 6100);
-		}
-	} else if (index > system_backlight_target) {
-		for(index; index > system_backlight_target; index =index - fflbackrate) {
-			if((is_ffl_enable ==FFL_EXIT_FULLY_CONTROL) ||
-			   !ffl_work_running)
-				break;
-			mutex_lock(&display->panel->panel_lock);
-			dsi_panel_set_backlight(display->panel, index);
-			mutex_unlock(&display->panel->panel_lock);
-			usleep_range(6000, 6100);
-		}
-	}
-
-	mutex_lock(&display->panel->panel_lock);
-	system_backlight_target = display->panel->bl_config.bl_level;
-	dsi_panel_set_backlight(display->panel, system_backlight_target);
-	oppo_ffl_trigger_finish = true;
-	mutex_unlock(&display->panel->panel_lock);
-
-	rc = dsi_display_clk_ctrl(display->dsi_clk_handle,
-			DSI_CORE_CLK, DSI_CLK_OFF);
-	if (rc) {
-		pr_err("[%s] failed to disable DSI core clocks, rc=%d\n",
-				display->name, rc);
-	}
-}
-
-int oppo_start_ffl_thread(void)
-{
-	mutex_lock(&oppo_ffl_lock);
-
-	ffl_work_running = true;
-	if (is_ffl_enable == FFL_TRIGGLE_CONTROL) {
-		oppo_ffl_trigger_finish = false;
-		kthread_queue_work(&oppo_ffl_worker, &oppo_ffl_work);
-	}
-
-	mutex_unlock(&oppo_ffl_lock);
-	return 0;
-}
-
-void oppo_stop_ffl_thread(void)
-{
-	mutex_lock(&oppo_ffl_lock);
-
-	oppo_ffl_trigger_finish = true;
-	ffl_work_running = false;
-	kthread_flush_worker(&oppo_ffl_worker);
-
-	mutex_unlock(&oppo_ffl_lock);
 }
 
 /*cabc node - /sys/kernel/oppo_display/cabc-----begin*/
@@ -2529,7 +2405,6 @@ static ssize_t oppo_display_notify_fp_press(struct device *dev,
 	static ktime_t on_time;
 	bool mode_changed = false;
 	int onscreenfp_status = 0;
-	int vblank_get = -EINVAL;
 	int err = 0;
 	int i;
 
@@ -2556,39 +2431,7 @@ static ssize_t oppo_display_notify_fp_press(struct device *dev,
 		}
 	}
 
-	vblank_get = drm_crtc_vblank_get(dsi_connector->state->crtc);
-	if (vblank_get) {
-		pr_err("failed to get crtc vblank\n", vblank_get);
-	}
 	oppo_onscreenfp_status = onscreenfp_status;
-
-	if (onscreenfp_status &&
-	    OPPO_DISPLAY_AOD_SCENE == get_oppo_display_scene() && !display->panel->oppo_priv.is_aod_ramless) {
-		/* enable the clk vote for CMD mode panels */
-		if (display->config.panel_mode == DSI_OP_CMD_MODE) {
-			dsi_display_clk_ctrl(display->dsi_clk_handle,
-					DSI_ALL_CLKS, DSI_CLK_ON);
-		}
-
-		mutex_lock(&display->panel->panel_lock);
-
-		if (display->panel->panel_initialized)
-			err = dsi_panel_tx_cmd_set(display->panel, DSI_CMD_AOD_HBM_ON);
-
-		mutex_unlock(&display->panel->panel_lock);
-		if (err)
-			pr_err("failed to setting aod hbm on mode %d\n", err);
-
-		if (display->config.panel_mode == DSI_OP_CMD_MODE) {
-			dsi_display_clk_ctrl(display->dsi_clk_handle,
-					DSI_ALL_CLKS, DSI_CLK_OFF);
-		}
-	}
-
-	if (!display->panel->oppo_priv.is_aod_ramless) {
-		oppo_onscreenfp_vblank_count = drm_crtc_vblank_count(dsi_connector->state->crtc);
-		oppo_onscreenfp_pressed_time = ktime_get();
-	}
 
 	drm_modeset_lock_all(drm_dev);
 
@@ -2657,8 +2500,6 @@ static ssize_t oppo_display_notify_fp_press(struct device *dev,
 
 error:
 	drm_modeset_unlock_all(drm_dev);
-	if (!vblank_get)
-		drm_crtc_vblank_put(dsi_connector->state->crtc);
 	return count;
 }
 
@@ -3026,6 +2867,7 @@ static DEVICE_ATTR(notify_panel_blank, S_IRUGO|S_IWUSR, NULL, oppo_display_notif
 static DEVICE_ATTR(ffl_set, S_IRUGO|S_IWUSR, oppo_get_ffl_setting, oppo_set_ffl_setting);
 static DEVICE_ATTR(notify_fppress, S_IRUGO|S_IWUSR, NULL, oppo_display_notify_fp_press);
 static DEVICE_ATTR(aod_light_mode_set, S_IRUGO|S_IWUSR, oppo_get_aod_light_mode, oppo_set_aod_light_mode);
+static DEVICE_ATTR(cabc, S_IRUGO|S_IWUSR, oppo_display_get_cabc, oppo_display_set_cabc);
 static DEVICE_ATTR(aod_area, S_IRUGO|S_IWUSR, oppo_display_get_aod_area, oppo_display_set_aod_area);
 static DEVICE_ATTR(video, S_IRUGO|S_IWUSR, oppo_display_get_video, oppo_display_set_video);
 static DEVICE_ATTR(failsafe, S_IRUGO|S_IWUSR, oppo_display_get_failsafe, oppo_display_set_failsafe);
@@ -3061,6 +2903,7 @@ static struct attribute *oppo_display_attrs[] = {
 	&dev_attr_esd_status.attr,
 	&dev_attr_notify_panel_blank.attr,
 	&dev_attr_ffl_set.attr,
+	&dev_attr_cabc.attr,
 	&dev_attr_notify_fppress.attr,
 	&dev_attr_aod_light_mode_set.attr,
 	&dev_attr_aod_area.attr,
@@ -3113,11 +2956,6 @@ static int __init oppo_display_private_api_init(void)
 	if (retval)
 		goto error_remove_sysfs_group;
 
-	kthread_init_worker(&oppo_ffl_worker);
-	kthread_init_work(&oppo_ffl_work, &oppo_ffl_setting_thread);
-	oppo_ffl_thread = kthread_run(kthread_worker_fn,
-				      &oppo_ffl_worker, "oppo_ffl");
-
 	return 0;
 
 error_remove_sysfs_group:
@@ -3130,13 +2968,6 @@ error_remove_kobj:
 
 static void __exit oppo_display_private_api_exit(void)
 {
-	if (oppo_ffl_thread) {
-		is_ffl_enable = FFL_EXIT_FULLY_CONTROL;
-		kthread_flush_worker(&oppo_ffl_worker);
-		kthread_stop(oppo_ffl_thread);
-		oppo_ffl_thread = NULL;
-	}
-
 	sysfs_remove_link(oppo_display_kobj, "panel");
 	sysfs_remove_group(oppo_display_kobj, &oppo_display_attr_group);
 	kobject_put(oppo_display_kobj);

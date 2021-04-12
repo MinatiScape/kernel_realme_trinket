@@ -50,6 +50,8 @@ enum{
 	HARDWARE_FRONT_CAM_SENSORID,
 	HARDWARE_BOARD_ID,
 	HARDWARE_HARDWARE_ID,
+	HARDWARE_CHARGER_IC,
+	HARDWARE_BMS_GAUGE,
 	HARDWARE_MAX_ITEM
 };
 
@@ -95,11 +97,12 @@ enum{
 #define HARDWARE_BACK_MACROCAM_GET                  _IOWR(HARDWARE_ID, 0x32, char[HARDWARE_MAX_ITEM_LONGTH])            //  multi back camera，back macro
 #define HARDWARE_BACK_WIDECAM_GET                   _IOWR(HARDWARE_ID, 0x33, char[HARDWARE_MAX_ITEM_LONGTH])            //  multi back camera，back macro
 
+#define HARDWARE_BMS_GAUGE_GET		                _IOWR(HARDWARE_ID, 0x41, char[HARDWARE_MAX_ITEM_LONGTH])
 #define HARDWARE_BACK_CAM_MOUDULE_ID_SET            _IOWR(HARDWARE_ID, 0x81, char[HARDWARE_MAX_ITEM_LONGTH])
 #define HARDWARE_FRONT_CAM_MODULE_ID_SET            _IOWR(HARDWARE_ID, 0x82, char[HARDWARE_MAX_ITEM_LONGTH])
 #define HARDWARE_BACK_SUBCAM_MODULE_ID_SET          _IOWR(HARDWARE_ID, 0x83, char[HARDWARE_MAX_ITEM_LONGTH])
 
-
+#define HARDWARE_CHARGER_IC_INFO_GET                _IOWR(HARDWARE_ID, 0x86, char[HARDWARE_MAX_ITEM_LONGTH])
 
 int hardwareinfo_set_prop(int cmd, const char *name);
 void hardwareinfo_tp_register(void (*fn)(void *), void *driver_data);

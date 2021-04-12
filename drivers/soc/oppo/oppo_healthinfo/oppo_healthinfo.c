@@ -132,13 +132,13 @@ static char msg_buf[OH_MSG_LEN] = {0};
 void ohm_action_trig(int type)
 {
         if (!ohm_action_ctrl) {
-                ohm_err("ctrl off\n");
+                ohm_err_deferred("ctrl off\n");
                 return;
         }
-        ohm_debug("%s trig action\n", sched_list[type]);
+        ohm_debug_deferred("%s trig action\n", sched_list[type]);
         if (OHM_MEM_MON == type || OHM_SCHED_FSYNC == type) {
                 if (!ohm_kobj) {
-                        ohm_err("kobj NULL\n");
+                        ohm_err_deferred("kobj NULL\n");
                         return;
                 }
                 sprintf(ohm_detect_env[1], "OHMTYPE=%s", sched_list[type]);

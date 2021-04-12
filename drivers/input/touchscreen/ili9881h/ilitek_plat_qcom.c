@@ -21,6 +21,8 @@
  */
 
 #include "ilitek.h"
+#include <soc/oppo/oppo_project.h>
+
 #ifndef ODM_WT_EDIT
 #define ODM_WT_EDIT
 #endif
@@ -49,11 +51,19 @@ unsigned char fw_xlgg3[] = {
 };
 
 #ifdef ODM_WT_EDIT
+//Bin.Su@ODM_WT.BSP.TP,2019/06/05,Add monet K add ili9881 inx gg3
+unsigned char fw_inxg[] = {
+#include "firmware_ili/20667/RA170X1.ili"
+};
+#endif
+
+#ifdef ODM_WT_EDIT
 //Bin.Su@ODM_WT.BSP.TP,2019/06/05,Add sign firmware function begain
 struct upgrade_ili_fw_info ili_fw_list[] = {
     {XL, "TRULY", fw_xl,(int)sizeof(fw_xl), REQUEST_FW_PATH_AUO, XL_INI_NAME_PATH,OPPO_SIGN_AUO},
     {INX, "inx", fw_inx, (int)sizeof(fw_inx),REQUEST_FW_PATH_INX, INX_INI_NAME_PATH,OPPO_SIGN_INX},
 	{XLGG3, "TRULYGG3", fw_xlgg3, (int)sizeof(fw_xlgg3),REQUEST_FW_PATH_XLGG3, XLGG3_INI_NAME_PATH,OPPO_SIGN_AUOGG3},
+	{INX, "inxg", fw_inxg, (int)sizeof(fw_inxg),REQUEST_FW_PATH_INXG, INXG_INI_NAME_PATH,OPPO_SIGN_INXG},
 };
 #endif
 
@@ -687,6 +697,8 @@ static int ilitek_plat_probe(void)
 dsi_ili9881h_truly_video_display  	 	（群创的临时屏）
 dsi_ili9881h_truly_auo_video_display 	（信利德正式屏）
 dsi_ili9881h_innolux_inx_video_display  （群创的正式屏）
+dsi_ili9881h_innolux_inx_gg3_video_display
+
 */
 	cmdline_tp = strstr(saved_command_line,"dsi_ili9881h_");
 	printk("cmdline_tp = %s\n",cmdline_tp);
@@ -711,9 +723,15 @@ dsi_ili9881h_innolux_inx_video_display  （群创的正式屏）
 				printk("this is XL AUOGG3 panel");
 				ili_ctpmodule = 2;
 			}else{
-				ili_ctpmodule = -1;
-				printk("This ilitek panenl is not used in this project");
-				return -1;
+				ili_ctpmodule = strncmp(temp,"innolux_inx_gg3_video",strlen("innolux_inx_gg3_video"));
+				if(ili_ctpmodule == 0){
+					printk("this is INX GG3 panel");
+					ili_ctpmodule = 3;
+				}else{
+					ili_ctpmodule = -1;
+					printk("This ilitek panenl is not used in this project");
+					return -1;
+				}
 			}
 		}
 	}

@@ -154,6 +154,12 @@ static int bolero_cdc_update_wcd_event(void *handle, u16 event, u32 data)
 			priv->macro_params[RX_MACRO].event_handler(priv->codec,
 				BOLERO_MACRO_EVT_IMPED_FALSE, data);
 		break;
+	case WCD_BOLERO_EVT_BCS_CLK_OFF:
+		if (priv->macro_params[TX_MACRO].event_handler)
+			priv->macro_params[TX_MACRO].event_handler(
+				priv->codec,
+				BOLERO_MACRO_EVT_BCS_CLK_OFF, data);
+		break;
 	default:
 		dev_err(priv->dev, "%s: Invalid event %d trigger from wcd\n",
 			__func__, event);
@@ -522,6 +528,29 @@ err:
 }
 EXPORT_SYMBOL(bolero_request_clock);
 
+void bolero_wsa_pa_on(struct device *dev)
+{
+	struct bolero_priv *priv;
+
+	if (!dev) {
+		pr_err("%s: dev is null\n", __func__);
+		return;
+	}
+	if (!bolero_is_valid_macro_dev(dev)) {
+		dev_err(dev, "%s: not a valid child dev\n",
+			__func__);
+		return;
+	}
+	priv = dev_get_drvdata(dev->parent);
+	if (!priv) {
+		dev_err(dev, "%s: priv is null\n", __func__);
+		return;
+	}
+
+	bolero_cdc_notifier_call(priv, BOLERO_WCD_EVT_PA_ON_POST_FSCLK);
+}
+EXPORT_SYMBOL(bolero_wsa_pa_on);
+
 static ssize_t bolero_version_read(struct snd_info_entry *entry,
 				   void *file_private_data,
 				   struct file *file,
@@ -861,9 +890,7 @@ static int bolero_probe(struct platform_device *pdev)
 	u32 num_macros = 0;
 	int ret;
 	u32 slew_reg1 = 0, slew_reg2 = 0;
-	//Gong.Chen@ODM_WT.mm.audiodriver.Machine, 2019/06/13, ADD for wcd9370
 	u32 slew_val1 = 0, slew_val2 = 0;
-
 	char __iomem *slew_io_base1 = NULL, *slew_io_base2 = NULL;
 
 	priv = devm_kzalloc(&pdev->dev, sizeof(struct bolero_priv),
@@ -913,8 +940,6 @@ static int bolero_probe(struct platform_device *pdev)
 	ret = of_property_read_u32(pdev->dev.of_node, "slew_rate_reg1",
 				   &slew_reg1);
 
-	//ifdef ODM_WT_EDIT
-	//Gong.Chen@ODM_WT.mm.audiodriver.Machine, 2019/06/13, Modify for wcd9370
 	ret |= of_property_read_u32(pdev->dev.of_node, "slew_rate_val1",
 				   &slew_val1);
 	if (!ret) {
@@ -943,7 +968,6 @@ static int bolero_probe(struct platform_device *pdev)
 		/* update slew rate for tx/rx swr interface */
 		iowrite32(slew_val2, slew_io_base2);
 	}
-	//endif ODM_WT_EDIT
 	INIT_WORK(&priv->bolero_add_child_devices_work,
 		  bolero_add_child_devices);
 	schedule_work(&priv->bolero_add_child_devices_work);

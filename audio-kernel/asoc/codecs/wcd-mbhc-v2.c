@@ -34,6 +34,11 @@
 #include "wcd-mbhc-adc.h"
 #include "wcd-mbhc-v2-api.h"
 
+//#ifdef VENDOR_EDIT
+/* Ping.Zhang@BSP.TP.Init, 2019/04/24, Add for notify touchpanel status */
+//extern void switch_headset_state(int headset_state);
+//#endif
+
 void wcd_mbhc_jack_report(struct wcd_mbhc *mbhc,
 			  struct snd_soc_jack *jack, int status, int mask)
 {
@@ -307,6 +312,7 @@ out_micb_en:
 			/* enable pullup and cs, disable mb */
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_PULLUP);
 		else
+			#ifndef VENDOR_EDIT
 			/* Jianfeng.Qiu@PSW.MM.AudioDriver.HeadsetDet, 2017/04/10,
 			 * 1.Modify for some headset button not work after headset mic
 			 * stop use.(ex: stop recording, hangup voice call without plug
@@ -317,6 +323,16 @@ out_micb_en:
 			 */
 			/* enable current source and disable mb, pullup*/
 			wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
+			#else /* VENDOR_EDIT */
+			{
+				pr_info("%s: current_plug %d\n", __func__, mbhc->current_plug);
+				if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET) {
+					wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
+				} else {
+					wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_CS);
+				}
+			}
+			#endif /* VENDOR_EDIT */
 
 		/* configure cap settings properly when micbias is disabled */
 		if (mbhc->mbhc_cb->set_cap_mode)
@@ -615,9 +631,6 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 		hphlocp_off_report(mbhc, SND_JACK_OC_HPHL);
 		mbhc->current_plug = MBHC_PLUG_TYPE_NONE;
 		mbhc->force_linein = false;
-		#ifdef ODM_WT_EDIT
-		headset_notifier_call_chain(0,NULL);
-		#endif
 	} else {
 		/*
 		 * Report removal of current jack type.
@@ -670,7 +683,6 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 						SND_JACK_LINEOUT |
 						SND_JACK_ANC_HEADPHONE |
 						SND_JACK_UNSUPPORTED);
-			mbhc->force_linein = false;
 		}
 
 		if (mbhc->current_plug == MBHC_PLUG_TYPE_HEADSET &&
@@ -729,18 +741,51 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 			}
 		}
 
+		/* Do not calculate impedance again for lineout
+		 * as during playback pa is on and impedance values
+		 * will not be correct resulting in lineout detected
+		 * as headphone.
+		 */
+		if ((is_pa_on) && mbhc->force_linein == true) {
+			jack_type = SND_JACK_LINEOUT;
+			mbhc->current_plug = MBHC_PLUG_TYPE_HIGH_HPH;
+			if (mbhc->hph_status) {
+				mbhc->hph_status &= ~(SND_JACK_HEADSET |
+						SND_JACK_LINEOUT |
+						SND_JACK_UNSUPPORTED);
+				wcd_mbhc_jack_report(mbhc,
+						&mbhc->headset_jack,
+						mbhc->hph_status,
+						WCD_MBHC_JACK_MASK);
+			}
+		}
+
 		mbhc->hph_status |= jack_type;
 
+		#ifndef VENDOR_EDIT
+		/*huanli.chang@Multimedia.AudioDriver.HeadsetDet, 2019/10/22, Modify for log*/
 		pr_debug("%s: Reporting insertion %d(%x)\n", __func__,
 			 jack_type, mbhc->hph_status);
+		#else
+		pr_err("%s: Reporting insertion jack_type=%d(hph_status=%x) [1:headphone 3:headset 4:lineout]\n", __func__,
+			 jack_type, mbhc->hph_status);
+		#endif
 		wcd_mbhc_jack_report(mbhc, &mbhc->headset_jack,
 				    (mbhc->hph_status | SND_JACK_MECHANICAL),
 				    WCD_MBHC_JACK_MASK);
 		wcd_mbhc_clr_and_turnon_hph_padac(mbhc);
-		#ifdef ODM_WT_EDIT
-		headset_notifier_call_chain(1,NULL);
-		#endif
 	}
+//#ifdef VENDOR_EDIT
+/* Ping.Zhang@BSP.TP.Init, 2019/04/24, Add for notify touchpanel status */
+	//switch_headset_state(insertion);
+//#endif
+
+//#ifdef ODM_WT_EDIT
+//Bo.Zhang@ODM_WT.BSP.TP,2020/04/05, added for TP headset function begain
+	headset_notifier_call_chain(insertion,NULL);
+//Bo.Zhang@ODM_WT.BSP.TP,2020/04/05, added for TP headset function end
+//#endif /* ODM_WT_EDIT */
+	
 	pr_debug("%s: leave hph_status %x\n", __func__, mbhc->hph_status);
 }
 EXPORT_SYMBOL(wcd_mbhc_report_plug);
@@ -929,6 +974,13 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 
 	if ((mbhc->current_plug == MBHC_PLUG_TYPE_NONE) &&
 	    detection_type) {
+#ifdef VENDOR_EDIT
+		/*pangbin1@wingtech.com, 2019/8/16, add for plug and unplug frequently*/
+		if(!time_after(jiffies, mbhc->last_unplug_time + msecs_to_jiffies(1 * 1000)))
+			mbhc->delayed_time = 300;
+		else
+			mbhc->delayed_time = 0;
+#endif
 
 		/* If moisture is present, then enable polling, disable
 		 * moisture detection and wait for interrupt
@@ -1032,8 +1084,36 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 				mbhc->mbhc_cb->mbhc_moisture_detect_en(mbhc,
 									false);
 		}
+#ifdef VENDOR_EDIT
+		/*pangbin1@wingtech.com, 2019/8/16, add for plug and unplug frequently*/
+		mbhc->last_unplug_time = jiffies;
+#endif
 
 	} else if (!detection_type) {
+		#ifdef VENDOR_EDIT
+		/*Jianfeng.Qiu@PSW.MM.AudioDriver.HeadsetDet.2784831, 2020/01/20,
+		 *Add for disable micbias, when insert a HPH_HIGH device and detect as special
+		 *headset device(micbias_enable is true), then remove device before report
+		 *headset type, the micbias will remain enable.
+		 */
+		if (mbhc->micbias_enable) {
+			pr_info("%s: Need to disable MIC_BIAS_2\n", __func__);
+			if (mbhc->mbhc_cb->mbhc_micbias_control)
+				mbhc->mbhc_cb->mbhc_micbias_control(
+						codec, MIC_BIAS_2,
+						MICB_DISABLE);
+			if (mbhc->mbhc_cb->mbhc_micb_ctrl_thr_mic)
+				mbhc->mbhc_cb->mbhc_micb_ctrl_thr_mic(
+						codec,
+						MIC_BIAS_2, false);
+			if (mbhc->mbhc_cb->set_micbias_value) {
+				mbhc->mbhc_cb->set_micbias_value(codec);
+				WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_MICB_CTRL, 0);
+			}
+			mbhc->micbias_enable = false;
+		}
+		#endif /* VENDOR_EDIT */
+
 		/* Disable external voltage source to micbias if present */
 		if (mbhc->mbhc_cb->enable_mb_source)
 			mbhc->mbhc_cb->enable_mb_source(mbhc, false);
@@ -1055,6 +1135,10 @@ static irqreturn_t wcd_mbhc_mech_plug_detect_irq(int irq, void *data)
 	struct wcd_mbhc *mbhc = data;
 
 	pr_debug("%s: enter\n", __func__);
+	if (mbhc == NULL) {
+		pr_err("%s: NULL irq data\n", __func__);
+		return IRQ_NONE;
+	}
 	if (unlikely((mbhc->mbhc_cb->lock_sleep(mbhc, true)) == false)) {
 		pr_warn("%s: failed to hold suspend\n", __func__);
 		r = IRQ_NONE;
@@ -1268,7 +1352,7 @@ static irqreturn_t wcd_mbhc_hphl_ocp_irq(int irq, void *data)
 	struct wcd_mbhc *mbhc = data;
 	int val;
 
-	pr_err("%s: received HPHL OCP irq\n", __func__);
+	pr_debug("%s: received HPHL OCP irq\n", __func__);
 	if (mbhc) {
 		if (mbhc->mbhc_cb->hph_register_recovery) {
 			if (mbhc->mbhc_cb->hph_register_recovery(mbhc)) {
@@ -1306,7 +1390,7 @@ static irqreturn_t wcd_mbhc_hphr_ocp_irq(int irq, void *data)
 {
 	struct wcd_mbhc *mbhc = data;
 
-	pr_err("%s: received HPHR OCP irq\n", __func__);
+	pr_debug("%s: received HPHR OCP irq\n", __func__);
 
 	if (!mbhc) {
 		pr_err("%s: Bad mbhc private data\n", __func__);
@@ -1783,6 +1867,11 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_codec *codec,
 	mbhc->hph_type = WCD_MBHC_HPH_NONE;
 	mbhc->wcd_mbhc_regs = wcd_mbhc_regs;
 	mbhc->swap_thr = GND_MIC_SWAP_THRESHOLD;
+#ifdef VENDOR_EDIT
+	/*pangbin1@wingtech.com, 2019/8/16, add for plug and unplug frequently*/
+	mbhc->delayed_time = 0;
+	mbhc->last_unplug_time = 0;
+#endif
 
 	if (mbhc->intr_ids == NULL) {
 		pr_err("%s: Interrupt mapping not provided\n", __func__);

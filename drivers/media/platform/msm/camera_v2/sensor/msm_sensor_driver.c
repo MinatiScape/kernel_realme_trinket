@@ -161,14 +161,14 @@ static int32_t msm_sensor_driver_create_v4l_subdev
 	s_ctrl->msm_sd.sd.entity.name = s_ctrl->msm_sd.sd.name;
 	s_ctrl->msm_sd.close_seq = MSM_SD_CLOSE_2ND_CATEGORY | 0x3;
 #ifdef VENDOR_EDIT
-	/*s_ctrl->msm_sd.sd.entity.group_id = MSM_CAMERA_SUBDEV_SENSOR;
+	s_ctrl->msm_sd.sd.entity.group_id = MSM_CAMERA_SUBDEV_SENSOR;
 	if (s_ctrl->sensordata->sensor_info->position == 0) //back sensor
 	    s_ctrl->msm_sd.sd.entity.revision = 1;
 	else if (s_ctrl->sensordata->sensor_info->position == 1) //sub sensor
 	    s_ctrl->msm_sd.sd.entity.revision = 2;
-	else if (!strcmp(s_ctrl->sensordata->sensor_name, "ov02a1b"))
+	else if (!strcmp(s_ctrl->sensordata->sensor_name, "gc2375h_cxt"))
 	    s_ctrl->msm_sd.sd.entity.revision = 3;
-	else if (!strcmp(s_ctrl->sensordata->sensor_name, "gc2375h"))
+	else if (!strcmp(s_ctrl->sensordata->sensor_name, "ov02a1b"))
 	    s_ctrl->msm_sd.sd.entity.revision = 4;
 	else if (!strcmp(s_ctrl->sensordata->sensor_name, "hi846_sunny")
 		|| !strcmp(s_ctrl->sensordata->sensor_name, "ov8856_shinetech"))
@@ -181,7 +181,7 @@ static int32_t msm_sensor_driver_create_v4l_subdev
 	    s_ctrl->msm_sd.sd.entity.revision = 0;
 	pr_err("sensor_info->position %d, sensor_name %s revision=%d",
 	    s_ctrl->sensordata->sensor_info->position, s_ctrl->sensordata->sensor_name,
-	    s_ctrl->msm_sd.sd.entity.revision);*/
+	    s_ctrl->msm_sd.sd.entity.revision);
 #endif /* VENDOR_EDIT */
 	rc = msm_sd_register(&s_ctrl->msm_sd);
 	if (rc < 0) {
@@ -1331,10 +1331,6 @@ WT camera driver, save camera module info*/
 		snprintf(sensor_hardware_info, sizeof(sensor_hardware_info), "%s;%s",
              probed_info->sensor_name, "Xinli");
 		hardwareinfo_set_prop(HARDWARE_BACK_CAM, sensor_hardware_info);
-	} else if (!strcmp(probed_info->sensor_name, "s5kgm1_largan_2nd")){
-		snprintf(sensor_hardware_info, sizeof(sensor_hardware_info), "%s;%s",
-             probed_info->sensor_name, "Qtech");
-		hardwareinfo_set_prop(HARDWARE_BACK_CAM, sensor_hardware_info);
 	} else if (!strcmp(probed_info->sensor_name, "s5k3l6_ofilm")){
 		snprintf(sensor_hardware_info, sizeof(sensor_hardware_info), "%s;%s",
              probed_info->sensor_name, "Ofilm");
@@ -1371,9 +1367,9 @@ WT camera driver, save camera module info*/
 		snprintf(sensor_hardware_info, sizeof(sensor_hardware_info), "%s;%s",
              probed_info->sensor_name, "Holitech");
 		hardwareinfo_set_prop(HARDWARE_BACK_MACRO_CAM, sensor_hardware_info);
-	} else if (!strcmp(probed_info->sensor_name, "gc02m0_mono1")){
+	} else if (!strcmp(probed_info->sensor_name, "gc2375h_cxt")){
 		snprintf(sensor_hardware_info, sizeof(sensor_hardware_info), "%s;%s",
-             probed_info->sensor_name, "Holitech");
+             probed_info->sensor_name, "Chengxt");
 		hardwareinfo_set_prop(HARDWARE_BACK_CAM, sensor_hardware_info);
 	} else {
 		snprintf(sensor_hardware_info, sizeof(sensor_hardware_info), "%s;%s",

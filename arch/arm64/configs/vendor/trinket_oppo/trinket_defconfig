@@ -946,3 +946,8 @@ CONFIG_PROCESS_RECLAIM=y
 #//yh@PSW.BSP.Storage.EXT4, 2018-11-26 add for ext4 async discard suppot
 CONFIG_EXT4_ASYNC_DISCARD_SUPPORT=y
 #endif
+#ifdef VENDOR_EDIT
+#/*Huacai.Zhou@PSW.BSP.Kernel.Performance,2018-09-05,add zstd support*/
+CONFIG_CRYPTO_ZSTD=y
+CONFIG_CRYPTO_MANAGER2=y
+#endif /*VENDOR_EDIT*/

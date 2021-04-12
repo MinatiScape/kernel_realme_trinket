@@ -46,7 +46,7 @@
 #define NUM_INTERPOLATORS 2
 
 #define WSA_MACRO_MUX_INP_SHFT 0x3
-#define WSA_MACRO_MUX_INP_MASK1 0x38
+#define WSA_MACRO_MUX_INP_MASK1 0x07
 #define WSA_MACRO_MUX_INP_MASK2 0x38
 #define WSA_MACRO_MUX_CFG_OFFSET 0x8
 #define WSA_MACRO_MUX_CFG1_OFFSET 0x4
@@ -56,6 +56,8 @@
 #define WSA_MACRO_RX_PATH_CFG3_OFFSET 0x10
 #define WSA_MACRO_RX_PATH_DSMDEM_OFFSET 0x4C
 #define WSA_MACRO_FS_RATE_MASK 0x0F
+
+#define WSA_MACRO_MAX_DMA_CH_PER_PORT 0x2
 
 enum {
 	WSA_MACRO_RX0 = 0,
@@ -88,6 +90,24 @@ enum {
 	WSA_MACRO_SOFTCLIP0, /* RX0 */
 	WSA_MACRO_SOFTCLIP1, /* RX1 */
 	WSA_MACRO_SOFTCLIP_MAX
+};
+
+enum {
+	INTn_1_INP_SEL_ZERO = 0,
+	INTn_1_INP_SEL_RX0,
+	INTn_1_INP_SEL_RX1,
+	INTn_1_INP_SEL_RX2,
+	INTn_1_INP_SEL_RX3,
+	INTn_1_INP_SEL_DEC0,
+	INTn_1_INP_SEL_DEC1,
+};
+
+enum {
+	INTn_2_INP_SEL_ZERO = 0,
+	INTn_2_INP_SEL_RX0,
+	INTn_2_INP_SEL_RX1,
+	INTn_2_INP_SEL_RX2,
+	INTn_2_INP_SEL_RX3,
 };
 
 struct interp_sample_rate {
@@ -578,13 +598,16 @@ static int wsa_macro_set_prim_interpolator_rate(struct snd_soc_dai *dai,
 			inp0_sel = int_mux_cfg0_val & WSA_MACRO_MUX_INP_MASK1;
 			inp1_sel = (int_mux_cfg0_val >>
 					WSA_MACRO_MUX_INP_SHFT) &
-					WSA_MACRO_MUX_INP_MASK2;
+					WSA_MACRO_MUX_INP_MASK1;
 			inp2_sel = (int_mux_cfg1_val >>
 					WSA_MACRO_MUX_INP_SHFT) &
-					WSA_MACRO_MUX_INP_MASK2;
-			if ((inp0_sel == int_1_mix1_inp) ||
-			    (inp1_sel == int_1_mix1_inp) ||
-			    (inp2_sel == int_1_mix1_inp)) {
+					WSA_MACRO_MUX_INP_MASK1;
+			if ((inp0_sel == (int_1_mix1_inp +
+						INTn_1_INP_SEL_RX0)) ||
+			    (inp1_sel == (int_1_mix1_inp +
+						INTn_1_INP_SEL_RX0)) ||
+			    (inp2_sel == int_1_mix1_inp +
+						INTn_1_INP_SEL_RX0)) {
 				int_fs_reg = BOLERO_CDC_WSA_RX0_RX_PATH_CTL +
 					     WSA_MACRO_RX_PATH_OFFSET * j;
 				dev_dbg(wsa_dev,
@@ -636,7 +659,8 @@ static int wsa_macro_set_mix_interpolator_rate(struct snd_soc_dai *dai,
 		for (j = 0; j < NUM_INTERPOLATORS; j++) {
 			int_mux_cfg1_val = snd_soc_read(codec, int_mux_cfg1) &
 							WSA_MACRO_MUX_INP_MASK1;
-			if (int_mux_cfg1_val == int_2_inp) {
+			if (int_mux_cfg1_val == (int_2_inp +
+						INTn_2_INP_SEL_RX0)) {
 				int_fs_reg =
 					BOLERO_CDC_WSA_RX0_RX_PATH_MIX_CTL +
 					WSA_MACRO_RX_PATH_OFFSET * j;
@@ -731,6 +755,7 @@ static int wsa_macro_get_channel_map(struct snd_soc_dai *dai,
 	struct snd_soc_codec *codec = dai->codec;
 	struct device *wsa_dev = NULL;
 	struct wsa_macro_priv *wsa_priv = NULL;
+	unsigned int temp = 0, ch_mask = 0, i = 0;
 
 	if (!wsa_macro_get_data(codec, &wsa_dev, &wsa_priv, __func__))
 		return -EINVAL;
@@ -747,8 +772,16 @@ static int wsa_macro_get_channel_map(struct snd_soc_dai *dai,
 		break;
 	case WSA_MACRO_AIF1_PB:
 	case WSA_MACRO_AIF_MIX1_PB:
-		*rx_slot = wsa_priv->active_ch_mask[dai->id];
-		*rx_num = wsa_priv->active_ch_cnt[dai->id];
+		for_each_set_bit(temp, &wsa_priv->active_ch_mask[dai->id],
+				WSA_MACRO_RX_MAX) {
+			ch_mask |= (1 << temp);
+			if (++i == WSA_MACRO_MAX_DMA_CH_PER_PORT)
+				break;
+		}
+		if (ch_mask & 0x0C)
+			ch_mask = ch_mask >> 0x2;
+		*rx_slot = ch_mask;
+		*rx_num = i;
 		break;
 	default:
 		dev_err(wsa_dev, "%s: Invalid AIF\n", __func__);
@@ -790,10 +823,13 @@ static int wsa_macro_digital_mute(struct snd_soc_dai *dai, int mute)
 		if (snd_soc_read(codec, dsm_reg) & 0x01) {
 			if (int_mux_cfg0_val || (int_mux_cfg1_val & 0x38))
 				snd_soc_update_bits(codec, reg, 0x20, 0x20);
-			if (int_mux_cfg1_val & 0x07)
+			if (int_mux_cfg1_val & 0x07) {
+				snd_soc_update_bits(codec, reg, 0x20, 0x20);
 				snd_soc_update_bits(codec, mix_reg, 0x20, 0x20);
+			}
 		}
 	}
+	bolero_wsa_pa_on(wsa_dev);
 		break;
 	default:
 		break;
@@ -956,6 +992,9 @@ static int wsa_macro_event_handler(struct snd_soc_codec *codec, u16 event,
 	struct wsa_macro_priv *wsa_priv = NULL;
 
 	if (!wsa_macro_get_data(codec, &wsa_dev, &wsa_priv, __func__))
+		return -EINVAL;
+
+	if (!(wsa_priv->swr_ctrl_data))
 		return -EINVAL;
 
 	switch (event) {
@@ -1336,15 +1375,18 @@ static bool wsa_macro_adie_lb(struct snd_soc_codec *codec, int interp_idx)
 	int_mux_cfg1_val = snd_soc_read(codec, int_mux_cfg1);
 
 	int_n_inp0 = int_mux_cfg0_val & 0x0F;
-	if (int_n_inp0 == 0x5 || int_n_inp0 == 0x6)
+	if (int_n_inp0 == INTn_1_INP_SEL_DEC0 ||
+		int_n_inp0 == INTn_1_INP_SEL_DEC1)
 		return true;
 
 	int_n_inp1 = int_mux_cfg0_val >> 4;
-	if (int_n_inp1 == 0x5 || int_n_inp1 == 0x6)
+	if (int_n_inp1 == INTn_1_INP_SEL_DEC0 ||
+		int_n_inp1 == INTn_1_INP_SEL_DEC1)
 		return true;
 
 	int_n_inp2 = int_mux_cfg1_val >> 4;
-	if (int_n_inp2 == 0x5 || int_n_inp2 == 0x6)
+	if (int_n_inp2 == INTn_1_INP_SEL_DEC0 ||
+		int_n_inp2 == INTn_1_INP_SEL_DEC1)
 		return true;
 
 	return false;
@@ -1356,13 +1398,23 @@ static int wsa_macro_enable_main_path(struct snd_soc_dapm_widget *w,
 {
 	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm);
 	u16 reg = 0;
+	struct device *wsa_dev = NULL;
+	struct wsa_macro_priv *wsa_priv = NULL;
+
+	if (!wsa_macro_get_data(codec, &wsa_dev, &wsa_priv, __func__))
+		return -EINVAL;
+
 
 	reg = BOLERO_CDC_WSA_RX0_RX_PATH_CTL +
 			WSA_MACRO_RX_PATH_OFFSET * w->shift;
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-		if (wsa_macro_adie_lb(codec, w->shift))
+		if (wsa_macro_adie_lb(codec, w->shift)) {
 			snd_soc_update_bits(codec, reg, 0x20, 0x20);
+			bolero_wsa_pa_on(wsa_dev);
+		}
+		break;
+	default:
 		break;
 	}
 	return 0;
@@ -2064,18 +2116,26 @@ static int wsa_macro_rx_mux_put(struct snd_kcontrol *kcontrol,
 			dev_err(wsa_dev, "%s: AIF reset already\n", __func__);
 			return 0;
 		}
+		if (aif_rst >= WSA_MACRO_RX_MAX) {
+			dev_err(wsa_dev, "%s: Invalid AIF reset\n", __func__);
+			return 0;
+		}
 	}
 	wsa_priv->rx_port_value[widget->shift] = rx_port_value;
 
 	bit_input = widget->shift;
-	if (widget->shift >= WSA_MACRO_RX_MIX)
-		bit_input %= WSA_MACRO_RX_MIX;
+
+	dev_dbg(wsa_dev,
+		"%s: mux input: %d, mux output: %d, bit: %d\n",
+		__func__, rx_port_value, widget->shift, bit_input);
 
 	switch (rx_port_value) {
 	case 0:
-		clear_bit(bit_input,
-			  &wsa_priv->active_ch_mask[aif_rst]);
-		wsa_priv->active_ch_cnt[aif_rst]--;
+		if (wsa_priv->active_ch_cnt[aif_rst]) {
+			clear_bit(bit_input,
+				  &wsa_priv->active_ch_mask[aif_rst]);
+			wsa_priv->active_ch_cnt[aif_rst]--;
+		}
 		break;
 	case 1:
 	case 2:
@@ -2085,7 +2145,8 @@ static int wsa_macro_rx_mux_put(struct snd_kcontrol *kcontrol,
 		break;
 	default:
 		dev_err(wsa_dev,
-			"%s: Invalid AIF_ID for WSA RX MUX\n", __func__);
+			"%s: Invalid AIF_ID for WSA RX MUX %d\n",
+			__func__, rx_port_value);
 		return -EINVAL;
 	}
 
@@ -2679,9 +2740,6 @@ static int wsa_swrm_clock(void *handle, bool enable)
 					BOLERO_CDC_WSA_CLK_RST_CTRL_SWR_CONTROL,
 					0x02, 0x00);
 			wsa_priv->reset_swr = false;
-			regmap_update_bits(regmap,
-				BOLERO_CDC_WSA_CLK_RST_CTRL_SWR_CONTROL,
-				0x1C, 0x0C);
 			msm_cdc_pinctrl_select_active_state(
 						wsa_priv->wsa_swr_gpio_p);
 		}

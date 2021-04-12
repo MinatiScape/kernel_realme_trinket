@@ -4,7 +4,6 @@
 
 #include <linux/types.h>
 
-
 struct sk_buff;
 
 /* endpoint node id auto assignment */

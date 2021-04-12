@@ -294,6 +294,12 @@ int mipi_dsi_dcs_set_display_brightness_himax(struct mipi_dsi_device *dsi,
 int mipi_dsi_dcs_get_display_brightness(struct mipi_dsi_device *dsi,
 					u16 *brightness);
 
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd.1941873, Start 2019/04/17, add CABC cmd used for power saving
+int mipi_dsi_dcs_set_display_cabc(struct mipi_dsi_device *dsi, u32 cabc_mode);
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd.1941873, End 2019/04/17, add CABC cmd used for power saving
+//#endif /* ODM_WT_EDIT */
+
 /**
  * struct mipi_dsi_driver - DSI driver
  * @driver: device driver model driver

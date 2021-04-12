@@ -1284,11 +1284,9 @@ void sdhci_send_command(struct sdhci_host *host, struct mmc_command *cmd)
 
 #ifdef VENDOR_EDIT
 //yh@bsp, 2015-10-21 Add for special card compatible
-//Guohua.Zhong@BSP.Storage.Sdcard,20180630 modify for use is_fsck_process whitelist "fsck"
-	if(host->mmc->card_stuck_in_programing_status && mmc_card_is_removable(host->mmc))
+	if(host->mmc->card_stuck_in_programing_status && ((cmd->opcode == MMC_WRITE_MULTIPLE_BLOCK) || (cmd->opcode == MMC_WRITE_BLOCK)))          
 	{
-		printk_once(KERN_INFO "%s:card_stuck_in_programing_status cmd:%d\n", mmc_hostname(host->mmc), cmd->opcode );
-
+		pr_info("blocked write cmd:%s\n", mmc_hostname(host->mmc));
 		cmd->error = -EIO;
 		sdhci_finish_mrq(host, cmd->mrq);
 		return;

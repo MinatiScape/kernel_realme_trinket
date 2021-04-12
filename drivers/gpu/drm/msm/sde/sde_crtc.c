@@ -3074,8 +3074,6 @@ static void sde_crtc_frame_event_work(struct kthread_work *work)
 	spin_unlock_irqrestore(&sde_crtc->spin_lock, flags);
 	SDE_ATRACE_END("crtc_frame_event");
 }
-extern u32 oppo_onscreenfp_vblank_count;
-extern ktime_t oppo_onscreenfp_pressed_time;
 void sde_crtc_complete_commit(struct drm_crtc *crtc,
 		struct drm_crtc_state *old_state)
 {
@@ -3112,38 +3110,7 @@ void sde_crtc_complete_commit(struct drm_crtc *crtc,
 			notifier_data.data = &blank;
 
 			if (cstate->fingerprint_defer_sync) {
-				u32 target_vblank = oppo_onscreenfp_vblank_count + 1;
-				struct timeval vblanktime;
-				ktime_t exp_ktime;
-				u32 current_vblank;
-				int ret;
-
-				current_vblank = drm_crtc_vblank_count_and_time(crtc, &vblanktime);
-
-				/*
-				 * possible hbm setting insert hardware te irq and soft vblank update
-				 * cause vblank calc error, add 4ms check to avoid this scene
-				 */
-				if (current_vblank == (oppo_onscreenfp_vblank_count + 1)) {
-					exp_ktime = ktime_add_ms(oppo_onscreenfp_pressed_time, 4);
-					if (ktime_compare_safe(exp_ktime, timeval_to_ktime(vblanktime)) > 0) {
-						target_vblank++;
-						pr_err("hbm setting may hit into hardware irq and soft update, wait one more vblank\n");
-					}
-				}
-
-				ret = wait_event_timeout(*drm_crtc_vblank_waitqueue(crtc),
-						target_vblank <= drm_crtc_vblank_count(crtc),
-						msecs_to_jiffies(50));
-				if (!ret)
-					pr_err("[fingerprint CRTC:%d:%s] vblank wait timed out\n",
-					       crtc->base.id, crtc->name);
-
-				if (current_vblank == drm_crtc_vblank_count(crtc)) {
-						ret = wait_event_timeout(*drm_crtc_vblank_waitqueue(crtc),
-							current_vblank != drm_crtc_vblank_count(crtc),
-							msecs_to_jiffies(17));
-				}
+				usleep_range(67 * 1000, 67 * 1000);
 			}
 			pr_err("fingerprint status: %s",
 			       blank ? "pressed" : "up");
@@ -5476,8 +5443,7 @@ static int sde_crtc_onscreenfinger_atomic_check(struct sde_crtc_state *cstate,
 	if (oppo_dimlayer_bl_enable) {
 		int backlight = oppo_get_panel_brightness();
 
-		if (backlight > 1 && backlight < oppo_dimlayer_bl_alpha_value &&
-		    oppo_ffl_trigger_finish == true) {
+		if (backlight > 1 && backlight < oppo_dimlayer_bl_alpha_value) {
 			ktime_t now = ktime_get();
 			ktime_t delta = ktime_sub(now, oppo_backlight_time);
 

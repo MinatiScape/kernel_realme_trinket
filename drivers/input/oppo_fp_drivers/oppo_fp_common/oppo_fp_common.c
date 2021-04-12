@@ -49,6 +49,7 @@
 
 #define ENGINEER_MENU_FPC1511  "-1,-1"  /* content in " " represents SNR,inclination test item in order in engineer menu, and -1/1 means off/on */
 #define ENGINEER_MENU_EGIS520  "-1,-1"
+#define ENGINEER_MENU_GSL6150  "-1,-1"
 
 #define ENGINEER_MENU_DEFAULT  "-1,-1"
 
@@ -73,6 +74,7 @@ extern int egis_opticalfp_irq_handler(struct fp_underscreen_info* tp_info);
 fp_module_config_t fp_module_config_list[] = {
 	{{1, -1, -1},  FP_FPC_1511, CHIP_FPC,  ENGINEER_MENU_FPC1511},
 	{{1,  0, -1},  FP_EGIS_520, CHIP_EGIS, ENGINEER_MENU_EGIS520},
+	{{0, -1, -1},  FP_SILEAD_6150, CHIP_SILEAD, ENGINEER_MENU_GSL6150},
 };
 #else
 fp_module_config_t fp_module_config_list[] = {
@@ -213,6 +215,11 @@ static int fp_get_matched_chip_module(struct device *dev, int fp_id1, int fp_id2
                     strncat(fp_manu, "_520", FP_ID_SUFFIX_MAX_LENGTH - 1);
                     strncpy(g_engineermode_menu_config, fp_module_config_list[i].engineermode_menu_config, ENGINEER_MENU_SELECT_MAXLENTH - 1);
 					return FP_EGIS_520;
+				case FP_SILEAD_6150:
+                    strncpy(fp_manu, CHIP_SILEAD, FP_ID_MAX_LENGTH - FP_ID_SUFFIX_MAX_LENGTH);
+                    strncat(fp_manu, "_6150", FP_ID_SUFFIX_MAX_LENGTH - 1);
+                    strncpy(g_engineermode_menu_config, fp_module_config_list[i].engineermode_menu_config, ENGINEER_MENU_SELECT_MAXLENTH - 1);
+					return FP_SILEAD_6150;
                 default:
                     dev_err(dev, "gpio ids matched but no matched vendor chip!");
                     return FP_UNKNOWN;
@@ -260,9 +267,14 @@ static int fp_register_proc_fs(struct fp_data *fp_data)
     fp_data->fp_id2 = gpio_get_value(fp_data->gpio_id2);
 #endif
 
-    if(19743 == project)
-        fp_data->fp_id1 = 0;
-
+    if((19743 == project) || (20667 == project)) {
+		fp_data->fp_id0 = gpio_get_value(fp_data->gpio_id0);
+		if (fp_data->fp_id0 == 0)
+			fp_data->fp_id1 = -1;
+		else 
+			fp_data->fp_id1 = 0;
+	}
+       
     dev_err(fp_data->dev, "fp_register_proc_fs check: fp_id0= %d, fp_id1= %d, fp_id2= %d, fp_id3 = %d, fp_id_retry= %d\n", \
             fp_data->fp_id0, fp_data->fp_id1, fp_data->fp_id2, fp_data->fp_id3, fp_id_retry);
 

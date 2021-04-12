@@ -55,6 +55,11 @@
 #include <linux/proc_fs.h>
 #endif
 
+#ifdef ODM_WT_EDIT
+/* Bin2.Zhang@ODM_WT.BSP.Charger.Basic, 2020-08-29, Add for battery/bms/chg hardwareinfo. */
+#include <linux/hardware_info.h>
+#endif /* ODM_WT_EDIT */
+
 #define smblib_err(chg, fmt, ...)		\
 	pr_err("%s: %s: " fmt, chg->name,	\
 		__func__, ##__VA_ARGS__)	\
@@ -8810,6 +8815,10 @@ static int smb5_chg_config_init(struct smb5 *chip)
 		rc = -EINVAL;
 		goto out;
 	}
+#ifdef ODM_WT_EDIT
+	/* Bin2.Zhang@ODM_WT.BSP.Charger.Basic, 2020-08-29, Add for battery/bms/chg hardwareinfo. */
+	hardwareinfo_set_prop(HARDWARE_CHARGER_IC, chg->name);
+#endif /* ODM_WT_EDIT */
 
 	chg->chg_freq.freq_5V			= 600;
 	chg->chg_freq.freq_6V_8V		= 800;
@@ -10395,6 +10404,11 @@ static enum power_supply_property smb5_batt_props[] = {
     POWER_SUPPLY_PROP_SHORT_C_HW_FEATURE,
     POWER_SUPPLY_PROP_SHORT_C_HW_STATUS,
 #endif
+#ifdef CONFIG_OPPO_SHORT_IC_CHECK
+	POWER_SUPPLY_PROP_SHORT_C_IC_OTP_STATUS,
+	POWER_SUPPLY_PROP_SHORT_C_IC_VOLT_THRESH,
+	POWER_SUPPLY_PROP_SHORT_C_IC_OTP_VALUE,
+#endif
 	POWER_SUPPLY_PROP_CHIP_SOC,
 	POWER_SUPPLY_PROP_CTRL_BY_HOTSPOT,
 	POWER_SUPPLY_PROP_CTRL_BY_CAMERA,
@@ -10772,6 +10786,15 @@ static int smb5_batt_get_prop(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_FCC_STEPPER_ENABLE:
 		val->intval = chg->fcc_stepper_enable;
 		break;
+#ifdef CONFIG_OPPO_SHORT_IC_CHECK
+	case POWER_SUPPLY_PROP_SHORT_C_IC_OTP_STATUS:
+		val->intval = 1;
+		break;
+	case POWER_SUPPLY_PROP_SHORT_C_IC_VOLT_THRESH:
+	case POWER_SUPPLY_PROP_SHORT_C_IC_OTP_VALUE:
+		val->intval = 0;
+		break;
+#endif
 	default:
 		pr_err("batt power supply prop %d not supported\n", psp);
 		return -EINVAL;
@@ -13841,6 +13864,25 @@ int qpnp_get_prop_charger_voltage_now(void)
 }
 #endif
 
+#ifdef ODM_WT_EDIT
+/* Bin2.Zhang@ODM_WT.BSP.Charger.Basic, 2020-08-26, Add for monitor Vbus current */
+static int oppochg_get_ibus(void)
+{
+	struct smb_charger *chg = NULL;
+	union power_supply_propval val;
+
+	if (!g_oppo_chip) {
+		chg_err("fail to init oppo_chip\n");
+		return 0;
+	}
+
+	chg = &g_oppo_chip->pmic_spmi.smb5_chip->chg;
+
+	power_supply_get_property(chg->usb_psy, POWER_SUPPLY_PROP_INPUT_CURRENT_NOW, &val);
+	return val.intval;
+}
+#endif /* ODM_WT_EDIT */
+
 #ifdef VENDOR_EDIT
 /*LiYue@BSP.CHG.Basic, 2019/07/15, add for usb temp check*/
 static bool oppo_usb_or_otg_is_present(void)
@@ -14184,6 +14226,10 @@ struct oppo_chg_operations  smb5_chg_ops = {
 #else
 	.get_charger_type = opchg_get_charger_type,
 	.get_charger_volt = qpnp_get_prop_charger_voltage_now,
+#ifdef ODM_WT_EDIT
+	/* Bin2.Zhang@ODM_WT.BSP.Charger.Basic, 2020-08-26, Add for monitor Vbus current */
+	.get_ibus			= oppochg_get_ibus,
+#endif /* ODM_WT_EDIT */
 	.check_chrdet_status = oppo_chg_is_usb_present,
 	.get_instant_vbatt = qpnp_get_battery_voltage,
 	.get_boot_mode = get_boot_mode,

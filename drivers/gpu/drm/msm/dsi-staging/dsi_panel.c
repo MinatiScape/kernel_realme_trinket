@@ -28,6 +28,7 @@
 #include "dsi_panel.h"
 #include "dsi_ctrl_hw.h"
 #include "dsi_parser.h"
+#include "../lm3697_bl.h"
 #ifdef VENDOR_EDIT
 /* Gou shengjun@PSW.MM.Display.LCD.Stability,2018/12/13
  * Add for get boot mode.
@@ -99,7 +100,7 @@ int is_ilitek_panel = 0;
 int panel_which = -1;
 
 
-int is_ktd3136 = 0;
+extern int is_ktd3136;
 
 #ifdef VENDOR_EDIT
 /*Kui.Feng@BSP.TP.Function, 2019/12/16, add shutdownflag node for lcd reset - /sys/kernel/oppo_display/shutdownflag*/
@@ -115,6 +116,13 @@ void  __attribute__((weak)) tp_goto_sleep_ftm(void) { return ; }
 static bool is_pd_with_guesture = false;
 #endif
 #endif/*VENDOR_EDIT*/
+
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/09/18, add ILI9881H INNOLUX INX GG3 LCD tag
+bool mipi_d_phy_ilitek_innolux_gg3_flag;
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add ILI9881H INNOLUX INX GG3 LCD tag
+//#endif /* ODM_WT_EDIT */
+
 static u32 dsi_dsc_rc_buf_thresh[] = {0x0e, 0x1c, 0x2a, 0x38, 0x46, 0x54,
 		0x62, 0x69, 0x70, 0x77, 0x79, 0x7b, 0x7d, 0x7e};
 
@@ -496,6 +504,11 @@ static int dsi_panel_reset(struct dsi_panel *panel)
 		if (rc)
 			pr_err("unable to set dir for mode gpio rc=%d\n", rc);
 	}
+	#ifdef VENDOR_EDIT
+	//guoqiang.jiang@oppo.com,2019.03.27,add himax 18112a panel
+	if(is_ktd3136 > 0)
+		lm3697_bl_enable(1);
+	#endif /* VENDOR_EDIT */
 exit:
 	return rc;
 }
@@ -569,6 +582,11 @@ static int dsi_panel_power_on(struct dsi_panel *panel)
 //#endif /* ODM_WT_EDIT */
 
 #endif/*VENDOR_EDIT*/
+	#ifdef VENDOR_EDIT
+	//guoqiang.jiang@oppo.com,2019.03.27,add himax 18112a panel
+	if (is_ktd3136 > 0)
+		lm3697_reg_init();
+	#endif /* VENDOR_EDIT */
 
 	goto exit;
 
@@ -626,6 +644,11 @@ static int dsi_panel_power_off(struct dsi_panel *panel)
 //Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, Add lcd log
 //#endif /* ODM_WT_EDIT */
 
+	#ifdef VENDOR_EDIT
+	//guoqiang.jiang@oppo.com,2019.03.27,add himax 18112a panel
+	if (is_ktd3136 > 0)
+		lm3697_bl_enable(0);
+	#endif /* VENDOR_EDIT */
 
 	return rc;
 }
@@ -954,6 +977,16 @@ static int dsi_panel_update_backlight(struct dsi_panel *panel,
 
 	dsi = &panel->mipi_device;
 	}else{
+	#ifdef VENDOR_EDIT
+	//guoqiang.jiang@oppo.com,2019.03.27,add himax 18112a panel
+	if (bl_lvl > 2047) {
+		bl_lvl = 2047;
+	}
+
+	if (is_ktd3136 > 0) {
+		lm3697_lcd_backlight_set_level(bl_lvl);
+	} else {
+	#endif /* VENDOR_EDIT */
 
 	#ifndef VENDOR_EDIT
 	//liwei.a@PSW.MM.Display.LCD.Machine, 2019/05/12, add for setting backlight by dcs
@@ -1053,6 +1086,101 @@ int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl)
 
 	return rc;
 }
+
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/09, add CABC cmd used for power saving
+static unsigned int panel_cabc_mode = 0;
+int dsi_panel_set_cabc_mode(struct dsi_panel *panel, u32 cabc_mode)
+{
+	int rc = 0;
+	struct mipi_dsi_device *dsi;
+
+	if (!panel) {
+		pr_err("Invalid Params\n");
+		return -EINVAL;
+	}
+	dsi = &panel->mipi_device;
+
+	switch (cabc_mode) {
+	case 0:
+		if (!panel->novatek_flag)
+		{
+			rc = mipi_dsi_dcs_set_display_cabc(dsi, 0);
+			if (rc < 0) {
+				pr_err("Failed to update dcs cabc:%d\n", cabc_mode);
+				return -EINVAL;
+			}
+			pr_info("LCD LOG ili9881h cabc func:%s\n",__func__);
+		}
+		else
+		{
+			rc = dsi_panel_cabc_off_enable(panel);
+			if (rc < 0) {
+				pr_err("Failed to update dcs cabc:%d\n", cabc_mode);
+				return -EINVAL;
+			}
+			pr_info("LCD LOG nt36525b cabc func:%s\n",__func__);
+		}
+		pr_info("cabc_mode:%d\n", cabc_mode);
+		break;
+	case 1:
+		rc = dsi_panel_cabc_ui_mode_enable(panel);
+		if (rc) {
+		pr_err("[%s] failed to cabc ui mode enable DSI panel, rc=%d\n",
+			panel->name, rc);
+		return -EINVAL;
+		}
+		break;
+	case 2:
+		rc = dsi_panel_cabc_still_mode_enable(panel);
+		if (rc) {
+		pr_err("[%s] failed to cabc ui mode enable DSI panel, rc=%d\n",
+			panel->name, rc);
+		return -EINVAL;
+		}
+		break;
+	case 3:
+		rc = dsi_panel_cabc_moving_mode_enable(panel);
+		if (rc) {
+		pr_err("[%s] failed to cabc ui mode enable DSI panel, rc=%d\n",
+			panel->name, rc);
+		return -EINVAL;
+		}
+		break;
+	default:
+		pr_info("cabc_mode:%d is invaild parameter,off cabc default\n", cabc_mode);
+		rc = mipi_dsi_dcs_set_display_cabc(dsi, 0);
+		if (rc < 0) {
+			pr_err("Failed to update dcs cabc:%d\n", cabc_mode);
+			return -EINVAL;
+		}
+		pr_info("cabc_mode:%d,turn off cabc default\n", cabc_mode);
+		break;
+	}
+
+	panel_cabc_mode = cabc_mode;
+
+	return rc;
+}
+
+int dsi_panel_get_cabc_mode(struct dsi_panel *panel, unsigned int *cabc_mode)
+{
+	int rc = 0;
+
+	if (!panel) {
+		pr_err("Invalid Params\n");
+		return -EINVAL;
+	}
+	if(!cabc_mode){
+		pr_err("Invalid Params\n");
+		return -EINVAL;
+	}
+	*cabc_mode = panel_cabc_mode;
+	pr_info(" read panel dcs cabc:%d\n", *cabc_mode);
+	return rc;
+}
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add CABC cmd used for power saving
+//#endif /* ODM_WT_EDIT */
 
 static u32 dsi_panel_get_brightness(struct dsi_backlight_config *bl)
 {
@@ -2089,6 +2217,14 @@ const char *cmd_set_prop_map[DSI_CMD_SET_MAX] = {
 	"qcom,mdss-dsi-failsafe-on-command",
 	"qcom,mdss-dsi-failsafe-off-command",
 #endif /*VENDOR_EDIT*/
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/09, add CABC cmd used for power saving
+	"qcom,mdss-dsi-cabc-off-command",
+	"qcom,mdss-dsi-cabc-ui-mode-command",
+	"qcom,mdss-dsi-cabc-still-mode-command",
+	"qcom,mdss-dsi-cabc-moving-mode-command",
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add CABC cmd used for power saving
+//#endif /* ODM_WT_EDIT */
 };
 
 const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
@@ -2141,6 +2277,14 @@ const char *cmd_set_state_map[DSI_CMD_SET_MAX] = {
 	"qcom,mdss-dsi-failsafe-on-command-state",
 	"qcom,mdss-dsi-failsafe-off-command-state",
 #endif /*VENDOR_EDIT*/
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/09, add CABC cmd used for power saving
+	"qcom,mdss-dsi-cabc-off-command-state",
+	"qcom,mdss-dsi-cabc-ui-mode-command-state",
+	"qcom,mdss-dsi-cabc-still-mode-command-state",
+	"qcom,mdss-dsi-cabc-moving-mode-command-state",
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add CABC cmd used for power saving
+//#endif /* ODM_WT_EDIT */
 };
 
 static int dsi_panel_get_cmd_pkt_count(const char *data, u32 length, u32 *cnt)
@@ -2445,6 +2589,13 @@ static int dsi_panel_parse_misc_features(struct dsi_panel *panel)
 //Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add NT36525B HOLITECH BOE LCD bringup code
 //#endif /* ODM_WT_EDIT */
 
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/09/18, add ILI9881H INNOLUX INX GG3 LCD tag
+	panel->ilitek_innolux_gg3_flag = utils->read_bool(utils->data,
+			"qcom,mdss-dsi-ilitek-innolux-gg3-flag");
+	mipi_d_phy_ilitek_innolux_gg3_flag = panel->ilitek_innolux_gg3_flag;
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add ILI9881H INNOLUX INX GG3 LCD tag
+//#endif /* ODM_WT_EDIT */
 	return 0;
 }
 
@@ -4900,6 +5051,78 @@ int dsi_panel_enable(struct dsi_panel *panel)
 #endif
 	return rc;
 }
+
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/09, add CABC cmd used for power saving
+int dsi_panel_cabc_off_enable(struct dsi_panel *panel)
+{
+	int rc = 0;
+
+	if (!panel) {
+		pr_err("Invalid params\n");
+		return -EINVAL;
+	}
+	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_CABC_OFF);
+	if (rc) {
+		pr_err("[%s] failed to send DSI_CMD_SET_CABC_OFF cmds, rc=%d\n",
+		       panel->name, rc);
+	}
+	return rc;
+}
+
+int dsi_panel_cabc_ui_mode_enable(struct dsi_panel *panel)
+{
+	int rc = 0;
+
+	if (!panel) {
+		pr_err("Invalid params\n");
+		return -EINVAL;
+	}
+	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_CABC_UI_MODE);
+	if (rc) {
+		pr_err("[%s] failed to send DSI_CMD_SET_CABC_UI_MODE cmds, rc=%d\n",
+		       panel->name, rc);
+	}
+	return rc;
+}
+
+int dsi_panel_cabc_still_mode_enable(struct dsi_panel *panel)
+{
+	int rc = 0;
+
+	if (!panel) {
+		pr_err("Invalid params\n");
+		return -EINVAL;
+	}
+
+	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_CABC_STILL_MODE);
+	if (rc) {
+		pr_err("[%s] failed to send DSI_CMD_SET_CABC_STILL_MODE cmds, rc=%d\n",
+		       panel->name, rc);
+	}
+	return rc;
+}
+
+int dsi_panel_cabc_moving_mode_enable(struct dsi_panel *panel)
+{
+	int rc = 0;
+
+	if (!panel) {
+		pr_err("Invalid params\n");
+		return -EINVAL;
+	}
+
+	rc = dsi_panel_tx_cmd_set(panel, DSI_CMD_SET_CABC_MOVING_MODE);
+	if (rc) {
+		pr_err("[%s] failed to send DSI_CMD_SET_CABC_MOVING_MODE cmds, rc=%d\n",
+		       panel->name, rc);
+	}
+	return rc;
+}
+
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add CABC cmd used for power saving
+//#endif /* ODM_WT_EDIT */
+
 
 int dsi_panel_post_enable(struct dsi_panel *panel)
 {

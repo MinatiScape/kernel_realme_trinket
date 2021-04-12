@@ -192,17 +192,31 @@ struct oppo_debug_gesture_record_info {
 #define BOOT_UPDATE_FIRMWARE 1
 #ifdef ODM_WT_EDIT
 //Bin.Su@ODM_WT.BSP.TP.FUNCTION.2018/12/04,Add skyw novatek TP IC
+
+
+
+#define BOOT_UPDATE_FIRMWARE_HLTG_NAME_20667 "tp/20667/nt_hltg_fw.bin"
+#define BOOT_UPDATE_FIRMWARE_HLT_NAME_20667 "tp/20667/nt_hlt_fw.bin"
 #define BOOT_UPDATE_FIRMWARE_HLTG_NAME "tp/19743/nt_hltg_fw.bin"
-#define BOOT_UPDATE_FIRMWARE_SKYW_NAME "novatek_skyw_fw.bin"
 #define BOOT_UPDATE_FIRMWARE_HLT_NAME "tp/19631/nt_hlt_fw.bin"
+#define BOOT_UPDATE_FIRMWARE_SKYW_NAME "novatek_skyw_fw.bin"
 
+
+
+#define MP_UPDATE_FIRMWARE_HLTG_NAME_20667 "tp/20667/nt_hltg_fw_mp.bin"
+#define MP_UPDATE_FIRMWARE_HLT_NAME_20667 "tp/20667/nt_hlt_fw_mp.bin"
 #define MP_UPDATE_FIRMWARE_HLTG_NAME "tp/19743/nt_hltg_fw_mp.bin"
-#define MP_UPDATE_FIRMWARE_SKYW_NAME "novatek_skyw_fw_mp.bin"
 #define MP_UPDATE_FIRMWARE_HLT_NAME "tp/19631/nt_hlt_fw_mp.bin"
+#define MP_UPDATE_FIRMWARE_SKYW_NAME "novatek_skyw_fw_mp.bin"
 
+
+
+#define OPPO_BOOT_UPDATE_FIRMWARE_NAME_HLTG_20667 "tp/20667/nt_hltg_fw_signed.bin"
+#define OPPO_BOOT_UPDATE_FIRMWARE_NAME_HLT_20667 "tp/20667/nt_hlt_fw_signed.bin"
 #define OPPO_BOOT_UPDATE_FIRMWARE_NAME_HLTG "tp/19743/nt_hltg_fw_signed.bin"
-#define OPPO_BOOT_UPDATE_FIRMWARE_NAME_SK "vendor/firmware/novatek_skyw_fw.bin"
 #define OPPO_BOOT_UPDATE_FIRMWARE_NAME_HLT "tp/19631/nt_hlt_fw_signed.bin"
+#define OPPO_BOOT_UPDATE_FIRMWARE_NAME_SK "vendor/firmware/novatek_skyw_fw.bin"
+
 
 #endif
 

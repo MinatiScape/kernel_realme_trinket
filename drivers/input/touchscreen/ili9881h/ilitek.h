@@ -137,19 +137,25 @@
 //#define CSV_LCM_OFF_PATH			"/data/vendor/fac_sources/ilitek_mp_lcm_off_log"
 
 #define XL_INI_NAME_PATH			    "/tp/19631/RA105A004.ini" ///vendor/firmware/mp.ini"
+#define INXG_INI_NAME_PATH				"/tp/20667/RA170X1.ini" ///vendor/firmware/mp.ini"
 #define INX_INI_NAME_PATH			    "/tp/19743/RA170X1.ini" ///vendor/firmware/mp.ini"
 #define XLGG3_INI_NAME_PATH				"/tp/19743/RA170A1.ini" ///vendor/firmware/mp.ini"
+
 
 #define UPDATE_FW_PATH			"/vendor/firmware/tp/19631/"
 
 #ifdef ODM_WT_EDIT
 #define OPPO_FIRMWARE_NAME_PATH_AUO				"vendor/firmware/tp/19631/"
+#define OPPO_FIRMWARE_NAME_PATH_INXG			"vendor/firmware/tp/20667/"
 #define OPPO_FIRMWARE_NAME_PATH_INX				"vendor/firmware/tp/19743/"
 #define OPPO_FIRMWARE_NAME_PATH_AUOGG3			"vendor/firmware/tp/19743/"
 
+
 #define REQUEST_FW_PATH_AUO				"/tp/19631/RA105A0.bin"
+#define REQUEST_FW_PATH_INXG			"/tp/20667/RA170X1.bin"
 #define REQUEST_FW_PATH_INX				"/tp/19743/RA170X1.bin"
 #define REQUEST_FW_PATH_XLGG3			"/tp/19743/RA170A1.bin"
+
 #endif
 //#define REQUEST_FW_PATH			"/vendor/firmware/ilitek_fw_auo_20190417.bin"
 
@@ -159,8 +165,10 @@
 #ifdef ODM_WT_EDIT
 //Bin.Su@ODM_WT.BSP.TP,2019/06/05,Add sign firmware function begain
 #define OPPO_SIGN_AUO                  "tp/19631/ilitek_fw_xl_signed.bin"
+#define OPPO_SIGN_INXG		           "tp/20667/ilitek_fw_inx_signed.bin"
 #define OPPO_SIGN_INX                  "tp/19743/ilitek_fw_inx_signed.bin"
 #define OPPO_SIGN_AUOGG3               "tp/19743/ilitek_fw_xlgg3_signed.bin"
+
 #endif
 
 #define DUMP_IRAM_PATH              "/sdcard/iram_dump"

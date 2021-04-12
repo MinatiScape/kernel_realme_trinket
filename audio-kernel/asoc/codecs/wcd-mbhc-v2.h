@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2018, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2014-2019, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -15,11 +15,13 @@
 #include <linux/wait.h>
 #include <linux/stringify.h>
 #include <linux/power_supply.h>
-#ifdef ODM_WT_EDIT
-#include <linux/headset_notifier.h>
-#endif
 #include "wcdcal-hwdep.h"
 #include <sound/jack.h>
+//#ifdef ODM_WT_EDIT
+//Bo.Zhang@ODM_WT.BSP.TP,2020/04/05, added for TP headset function begain
+#include <linux/headset_notifier.h>
+//Bo.Zhang@ODM_WT.BSP.TP,2020/04/05, added for TP headset function end
+//#endif /* ODM_WT_EDIT */
 
 #define TOMBAK_MBHC_NC	0
 #define TOMBAK_MBHC_NO	1
@@ -141,7 +143,14 @@ do {                                                    \
 				  SND_JACK_BTN_2 | SND_JACK_BTN_3 | \
 				  SND_JACK_BTN_4 | SND_JACK_BTN_5)
 #define OCP_ATTEMPT 20
+
+#ifndef VENDOR_EDIT
+/*xiang.fei@Multimedia.AudioDriver.HeadsetDet, 2017/04/10, Modify for headphone detect*/
 #define HS_DETECT_PLUG_TIME_MS (3 * 1000)
+#else
+#define HS_DETECT_PLUG_TIME_MS (5 * 1000)
+#endif
+
 #define SPECIAL_HS_DETECT_TIME_MS (2 * 1000)
 #define MBHC_BUTTON_PRESS_THRESHOLD_MIN 250
 #define GND_MIC_SWAP_THRESHOLD 4
@@ -463,6 +472,8 @@ struct wcd_mbhc_register {
 };
 
 struct wcd_mbhc_cb {
+	void (*bcs_enable)
+	(struct wcd_mbhc *mbhc, bool bcs_enable);
 	int (*enable_mb_source)(struct wcd_mbhc *, bool);
 	void (*trim_btn_reg)(struct snd_soc_codec *);
 	void (*compute_impedance)(struct wcd_mbhc *, uint32_t *, uint32_t *);
@@ -540,6 +551,7 @@ struct wcd_mbhc {
 	bool gnd_swh; /*track GND switch NC / NO */
 	u32 hs_thr;
 	u32 hph_thr;
+	u32 micb_mv;
 	u32 swap_thr;
 	u32 moist_vref;
 	u32 moist_iref;
@@ -602,6 +614,11 @@ struct wcd_mbhc {
 	bool force_linein;
 	struct device_node *fsa_np;
 	struct notifier_block fsa_nb;
+#ifdef VENDOR_EDIT
+	/*pangbin1@wingtech.com, 2019/8/16, add for plug and unplug frequently*/
+	unsigned delayed_time;
+	unsigned long last_unplug_time;
+#endif
 };
 
 void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,

@@ -1567,7 +1567,7 @@ int q6asm_audio_client_buf_alloc_contiguous(unsigned int dir,
 	}
 
 	#ifdef VENDOR_EDIT
-	/* Zhaoan.Xu@PSW.MM.AudioDriver.Platform.1569079, 2018/09/21, Add for fix STS test phone crash*/
+	/*Jianfeng.Qiu@PSW.MM.AudioDriver.Platform.1569079, 2019/08/21, Add for fix STS crash*/
 	if (bufcnt == 0) {
 		pr_err("%s: invalid buffer count\n", __func__);
 		return -EINVAL;

@@ -174,6 +174,8 @@ int adm_set_mic_gain(int port_id, int copp_idx, int volume);
 int adm_send_set_multichannel_ec_primary_mic_ch(int port_id, int copp_idx,
 				int primary_mic_ch);
 
+int adm_set_ffecns_effect(int effect);
+
 int adm_param_enable(int port_id, int copp_idx, int module_id,  int enable);
 
 int adm_param_enable_v2(int port_id, int copp_idx,
@@ -213,4 +215,7 @@ int adm_programable_channel_mixer(int port_id, int copp_idx, int session_id,
 void msm_dts_srs_acquire_lock(void);
 void msm_dts_srs_release_lock(void);
 void adm_set_native_mode(int mode);
+int adm_apr_send_pkt(void *data, wait_queue_head_t *wait,
+			int port_idx, int copp_idx);
+
 #endif /* __Q6_ADM_V2_H__ */

@@ -49,7 +49,6 @@
 #define DS2_ADM_COPP_TOPOLOGY_ID 0xFFFFFFFF
 #endif
 
-
 /* ENUM for adm_status */
 enum adm_cal_status {
 	ADM_STATUS_CALIBRATION_REQUIRED = 0,
@@ -100,12 +99,13 @@ struct adm_ctl {
 	struct param_outband outband_memmap;
 	struct source_tracking_data sourceTrackingData;
 
+	struct mutex adm_apr_lock;
 	int set_custom_topology;
 	int ec_ref_rx;
 	int num_ec_ref_rx_chans;
 	int ec_ref_rx_bit_width;
 	int ec_ref_rx_sampling_rate;
-
+	int ffecns_port_id;
 	int native_mode;
 };
 
@@ -899,6 +899,57 @@ exit:
 	return rc;
 }
 EXPORT_SYMBOL(adm_set_custom_chmix_cfg);
+ /*
+  * adm_apr_send_pkt : returns 0 on success, negative otherwise.
+  */
+int adm_apr_send_pkt(void *data, wait_queue_head_t *wait,
+								int port_idx, int copp_idx)
+{
+	 int ret = 0;
+	 atomic_t *copp_stat = NULL;
+	 wait = &this_adm.copp.wait[port_idx][copp_idx];
+
+	 if (!wait)
+		 return -EINVAL;
+
+	 mutex_lock(&this_adm.adm_apr_lock);
+	 pr_debug("%s: port idx  %d copp idx  %d\n", __func__,
+				 port_idx, copp_idx);
+	 copp_stat = &this_adm.copp.stat[port_idx][copp_idx];
+	 atomic_set(copp_stat, -1);
+
+	 if (atomic_read(&this_adm.copp.cnt[port_idx][copp_idx]) == 0) {
+		 pr_err("%s: port[0x%x] coppid[0x%x] is not active, ERROR\n",
+			 __func__, port_idx, copp_idx);
+		 mutex_unlock(&this_adm.adm_apr_lock);
+		 return -EINVAL;
+	 }
+
+	 ret = apr_send_pkt(this_adm.apr, data);
+	 if (ret > 0) {
+		 ret = wait_event_timeout(*wait,
+			 atomic_read(copp_stat) >= 0,
+			 msecs_to_jiffies(TIMEOUT_MS));
+		 if (atomic_read(copp_stat) > 0) {
+			 pr_err("%s: DSP returned error[%s]\n", __func__,
+				 adsp_err_get_err_str(atomic_read(copp_stat)));
+			 ret = adsp_err_get_lnx_err_code(atomic_read(copp_stat));
+		 } else  if (!ret) {
+			 pr_err_ratelimited("%s: request timedout\n",
+				 __func__);
+			 ret = -ETIMEDOUT;
+		 } else {
+			 ret = 0;
+		 }
+	 } else if (ret == 0) {
+		 pr_err("%s: packet not transmitted\n", __func__);
+		 /* apr_send_pkt can return 0 when nothing is transmitted */
+		 ret = -EINVAL;
+	 }
+
+	 mutex_unlock(&this_adm.adm_apr_lock);
+	 return ret;
+}
 
 /*
  * With pre-packed data, only the opcode differes from V5 and V6.
@@ -911,7 +962,6 @@ int adm_set_pp_params(int port_id, int copp_idx,
 	struct adm_cmd_set_pp_params *adm_set_params = NULL;
 	int size = 0;
 	int port_idx = 0;
-	atomic_t *copp_stat = NULL;
 	int ret = 0;
 
 	port_id = afe_convert_virtual_to_portid(port_id);
@@ -970,31 +1020,9 @@ int adm_set_pp_params(int port_id, int copp_idx,
 		goto done;
 	}
 
-	copp_stat = &this_adm.copp.stat[port_idx][copp_idx];
-	atomic_set(copp_stat, -1);
-	ret = apr_send_pkt(this_adm.apr, (uint32_t *) adm_set_params);
-	if (ret < 0) {
-		pr_err("%s: Set params APR send failed port = 0x%x ret %d\n",
-		       __func__, port_id, ret);
-		goto done;
-	}
-	ret = wait_event_timeout(this_adm.copp.wait[port_idx][copp_idx],
-				 atomic_read(copp_stat) >= 0,
-				 msecs_to_jiffies(TIMEOUT_MS));
-	if (!ret) {
-		pr_err("%s: Set params timed out port = 0x%x\n", __func__,
-		       port_id);
-		ret = -ETIMEDOUT;
-		goto done;
-	}
-	if (atomic_read(copp_stat) > 0) {
-		pr_err("%s: DSP returned error[%s]\n", __func__,
-		       adsp_err_get_err_str(atomic_read(copp_stat)));
-		ret = adsp_err_get_lnx_err_code(atomic_read(copp_stat));
-		goto done;
-	}
-
-	ret = 0;
+	ret = adm_apr_send_pkt((uint32_t *) adm_set_params,
+			&this_adm.copp.wait[port_idx][copp_idx],
+			port_idx, copp_idx);
 done:
 	kfree(adm_set_params);
 	return ret;
@@ -1630,8 +1658,15 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 					this_adm.sourceTrackingData.
 						apr_cmd_status = payload[1];
 				else if (rtac_make_adm_callback(payload,
-							data->payload_size))
-					break;
+							data->payload_size)) {
+					pr_debug("%s: rtac cmd response\n",
+						 __func__);
+				}
+				atomic_set(&this_adm.copp.stat[port_idx]
+						[copp_idx], payload[1]);
+				wake_up(
+				&this_adm.copp.wait[port_idx][copp_idx]);
+				break;
 				/*
 				 * if soft volume is called and already
 				 * interrupted break out of the sequence here
@@ -1640,8 +1675,8 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 			case ADM_CMD_DEVICE_CLOSE_V5:
 			case ADM_CMD_DEVICE_OPEN_V6:
 			case ADM_CMD_DEVICE_OPEN_V8:
-				pr_debug("%s: Basic callback received, wake up.\n",
-					__func__);
+				pr_debug("%s: Basic callback received for 0x%x, wake up.\n",
+					__func__, payload[0]);
 				atomic_set(&this_adm.copp.stat[port_idx]
 						[copp_idx], payload[1]);
 				wake_up(
@@ -1774,9 +1809,13 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 				this_adm.sourceTrackingData.apr_cmd_status =
 					payload[0];
 			else if (rtac_make_adm_callback(payload,
-							data->payload_size))
+							data->payload_size)){
+				pr_debug("%s: rtac cmd response\n", __func__);
+				atomic_set(&this_adm.copp.stat[port_idx][copp_idx],
+					   payload[0]);
+				wake_up(&this_adm.copp.wait[port_idx][copp_idx]);
 				break;
-
+			}
 			idx = ADM_GET_PARAMETER_LENGTH * copp_idx;
 			if (payload[0] == 0 && data->payload_size > 0) {
 				ret = adm_process_get_param_response(
@@ -2834,6 +2873,12 @@ static int adm_arrange_mch_ep2_map_v8(
  *
  * Returns 0 on success or error on failure
  */
+#ifdef VENDOR_EDIT
+/*Jianfeng.Qiu@PSW.MM.AudioDriver.Platform.1859584, 2019/02/27,
+ *Add for fix lvimfq not support sample_rate issue.
+ */
+#define VOICE_TOPOLOGY_LVIMFQ_TX_DM    0x1000BFF5
+#endif /* VENDOR_EDIT */
 
 int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 	     int perf_mode, uint16_t bit_width, int app_type, int acdb_id)
@@ -2904,14 +2949,37 @@ int adm_open(int port_id, int path, int rate, int channel_mode, int topology,
 	}
 
 	if ((topology == VPM_TX_SM_ECNS_V2_COPP_TOPOLOGY) ||
-	    (topology == VPM_TX_DM_FLUENCE_COPP_TOPOLOGY) ||
-	    (topology == VPM_TX_DM_RFECNS_COPP_TOPOLOGY)||
 	    (topology == VPM_TX_DM_FLUENCE_EF_COPP_TOPOLOGY)) {
 		if ((rate != ADM_CMD_COPP_OPEN_SAMPLE_RATE_8K) &&
 		    (rate != ADM_CMD_COPP_OPEN_SAMPLE_RATE_16K) &&
 		    (rate != ADM_CMD_COPP_OPEN_SAMPLE_RATE_32K) &&
 		    (rate != ADM_CMD_COPP_OPEN_SAMPLE_RATE_48K))
-		rate = 16000;
+			rate = 16000;
+	}
+	if ((topology == VPM_TX_DM_FLUENCE_COPP_TOPOLOGY) ||
+	    (topology == VPM_TX_DM_RFECNS_COPP_TOPOLOGY)) {
+		if ((rate != ADM_CMD_COPP_OPEN_SAMPLE_RATE_8K) &&
+		    (rate != ADM_CMD_COPP_OPEN_SAMPLE_RATE_16K) &&
+		    (rate != ADM_CMD_COPP_OPEN_SAMPLE_RATE_32K))
+			rate = 16000;
+	}
+
+	#ifdef VENDOR_EDIT
+	/*Jianfeng.Qiu@PSW.MM.AudioDriver.Platform.1859584, 2019/02/27,
+	 *Add for fix lvimfq not support sample_rate issue.
+	 */
+	if ((topology == VOICE_TOPOLOGY_LVIMFQ_TX_DM)
+		&& (rate != ADM_CMD_COPP_OPEN_SAMPLE_RATE_48K)) {
+		pr_info("%s: Change rate %d to 48K for copp 0x%x",
+			__func__, rate, topology);
+		rate = 48000;
+	}
+	#endif /* VENDOR_EDIT */
+
+	if (topology == FFECNS_TOPOLOGY) {
+		this_adm.ffecns_port_id = port_id;
+		pr_debug("%s: ffecns port id =%x\n", __func__,
+				this_adm.ffecns_port_id);
 	}
 
 	if (topology == VPM_TX_VOICE_SMECNS_V2_COPP_TOPOLOGY)
@@ -3691,6 +3759,10 @@ int adm_close(int port_id, int perf_mode, int copp_idx)
 		pr_debug("%s: remove adm device from rtac\n", __func__);
 		rtac_remove_adm_device(port_id, copp_id);
 	}
+
+	if (port_id == this_adm.ffecns_port_id)
+		this_adm.ffecns_port_id = -1;
+
 	return 0;
 }
 EXPORT_SYMBOL(adm_close);
@@ -4290,6 +4362,48 @@ int adm_send_set_multichannel_ec_primary_mic_ch(int port_id, int copp_idx,
 	return rc;
 }
 EXPORT_SYMBOL(adm_send_set_multichannel_ec_primary_mic_ch);
+
+/**
+ * adm_set_ffecns_effect -
+ *      command to set effect for ffecns module
+ *
+ * @effect: effect payload
+ *
+ * Returns 0 on success or error on failure
+ */
+int adm_set_ffecns_effect(int effect)
+{
+	struct ffecns_effect ffecns_params;
+	struct param_hdr_v3 param_hdr;
+	int rc = 0;
+	int copp_idx = 0;
+
+	copp_idx = adm_get_default_copp_idx(this_adm.ffecns_port_id);
+	if ((copp_idx < 0) || (copp_idx >= MAX_COPPS_PER_PORT)) {
+		pr_err("%s, no active copp to query rms copp_idx:%d\n",
+			__func__, copp_idx);
+		return -EINVAL;
+	}
+
+	memset(&ffecns_params, 0, sizeof(ffecns_params));
+	memset(&param_hdr, 0, sizeof(param_hdr));
+
+	param_hdr.module_id = FFECNS_MODULE_ID;
+	param_hdr.instance_id = INSTANCE_ID_0;
+	param_hdr.param_id = FLUENCE_CMN_GLOBAL_EFFECT_PARAM_ID;
+	param_hdr.param_size = sizeof(ffecns_params);
+
+	ffecns_params.payload = effect;
+
+	rc = adm_pack_and_set_one_pp_param(this_adm.ffecns_port_id, copp_idx,
+					param_hdr, (uint8_t *) &ffecns_params);
+	if (rc)
+		pr_err("%s: Failed to set ffecns effect, err %d\n",
+		       __func__, rc);
+
+	return rc;
+}
+EXPORT_SYMBOL(adm_set_ffecns_effect);
 
 /**
  * adm_param_enable -
@@ -5070,8 +5184,10 @@ int __init adm_init(void)
 	int i = 0, j;
 
 	this_adm.ec_ref_rx = -1;
+	this_adm.ffecns_port_id = -1;
 	init_waitqueue_head(&this_adm.matrix_map_wait);
 	init_waitqueue_head(&this_adm.adm_wait);
+	mutex_init(&this_adm.adm_apr_lock);
 
 	for (i = 0; i < AFE_MAX_PORTS; i++) {
 		for (j = 0; j < MAX_COPPS_PER_PORT; j++) {
@@ -5096,6 +5212,7 @@ int __init adm_init(void)
 
 void adm_exit(void)
 {
+	mutex_destroy(&this_adm.adm_apr_lock);
 	if (this_adm.apr)
 		adm_reset_data();
 	adm_delete_cal_data();

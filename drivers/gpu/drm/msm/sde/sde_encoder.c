@@ -4286,46 +4286,6 @@ void sde_encoder_trigger_kickoff_pending(struct drm_encoder *drm_enc)
 	}
 	sde_enc->idle_pc_restore = false;
 }
-#ifdef VENDOR_EDIT
-/* Gou shengjun@PSW.MM.Display.LCD.Feature,2018-11-21
- * Force enable dither on OnScreenFingerprint scene
-*/
-extern int oppo_dimlayer_dither_threshold;
-extern int oppo_dimlayer_dither_bitdepth;
-extern int oppo_get_panel_brightness_to_alpha(void);
-extern bool sde_crtc_get_dimlayer_mode(struct drm_crtc_state *crtc_state);
-static bool
-_sde_encoder_setup_dither_for_onscreenfingerprint(struct sde_encoder_phys *phys,
-						  void *dither_cfg, int len)
-{
-	struct drm_encoder *drm_enc = phys->parent;
-	struct drm_msm_dither dither;
-
-	if (!drm_enc || !drm_enc->crtc)
-		return -EFAULT;
-
-	if (!sde_crtc_get_dimlayer_mode(drm_enc->crtc->state))
-		return -EINVAL;
-
-	if (len != sizeof(dither))
-		return -EINVAL;
-
-	if (oppo_get_panel_brightness_to_alpha() < oppo_dimlayer_dither_threshold)
-		return -EINVAL;
-
-	memcpy(&dither, dither_cfg, len);
-	/*Jian.Zhou@PSW.MM.Display.LCD.Stable,2020-01-16 add for fix green screen issue*/
-	dither.c0_bitdepth = 8;
-	dither.c1_bitdepth = 8;
-	dither.c2_bitdepth = 8;
-	dither.c3_bitdepth = 8;
-	dither.temporal_en = 1;
-
-	phys->hw_pp->ops.setup_dither(phys->hw_pp, &dither, len);
-
-	return 0;
-}
-#endif /* VENDOR_EDIT */
 
 static void _sde_encoder_setup_dither(struct sde_encoder_phys *phys)
 {
@@ -4377,12 +4337,6 @@ static void _sde_encoder_setup_dither(struct sde_encoder_phys *phys)
 			}
 		}
 	} else {
-#ifdef VENDOR_EDIT
-/* Gou shengjun@PSW.MM.Display.LCD.Feature,2018-11-19
- * Force enable dither on OnScreenFingerprint scene
-*/
-		if (_sde_encoder_setup_dither_for_onscreenfingerprint(phys, dither_cfg, len))
-#endif /* VENDOR_EDIT */
 		phys->hw_pp->ops.setup_dither(phys->hw_pp, dither_cfg, len);
 	}
 }

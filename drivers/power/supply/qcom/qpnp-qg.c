@@ -55,6 +55,12 @@ static struct qpnp_qg *qg_chip = NULL;
 
 #endif
 
+#ifdef ODM_WT_EDIT
+/* Bin2.Zhang@ODM_WT.BSP.Charger.Basic, 2020-08-29, Add for battery/bms/chg hardwareinfo. */
+#include <linux/hardware_info.h>
+#define BMS_GAUGE_TYPE    "pmi632_qg"
+#endif /* ODM_WT_EDIT */
+
 #ifdef VENDOR_EDIT
 /* Ji.Xu PSW.BSP.CHG  2018-07-23  Save battery capacity to persist partition */
 static bool healthd_ready = false;
@@ -3086,6 +3092,11 @@ static int qg_load_battery_profile(struct qpnp_qg *chip)
 		return rc;
 	}
 
+#ifdef ODM_WT_EDIT
+	/* Bin2.Zhang@ODM_WT.BSP.Charger.Basic.1941873, 2020-08-29, Add for battery/bms/chg hardwareinfo. */
+	hardwareinfo_set_prop(HARDWARE_BATTERY_ID, chip->bp.batt_type_str);
+#endif /* ODM_WT_EDIT */
+
 	rc = qg_batterydata_init(profile_node);
 	if (rc < 0) {
 		pr_err("Failed to initialize battery-profile rc=%d\n", rc);
@@ -5136,8 +5147,13 @@ static int qpnp_qg_probe(struct platform_device *pdev)
 
 #ifdef VENDOR_EDIT
 /* Yichun.Chen PSW.BSP.CHG  2018-05-11  authenticate battery */
-    register_gauge_devinfo(chip);
+	register_gauge_devinfo(chip);
 #endif
+#ifdef ODM_WT_EDIT
+	/* Bin2.Zhang@ODM_WT.BSP.Charger.Basic, 2020-08-29, Add for battery/bms/chg hardwareinfo. */
+	hardwareinfo_set_prop(HARDWARE_BMS_GAUGE, BMS_GAUGE_TYPE);
+#endif /* ODM_WT_EDIT */
+
 	qg_get_battery_capacity(chip, &soc);
 	pr_info("QG initialized! battery_profile=%s SOC=%d QG_subtype=%d\n",
 			qg_get_battery_type(chip), soc, chip->qg_subtype);

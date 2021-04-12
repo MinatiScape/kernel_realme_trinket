@@ -812,6 +812,9 @@ int ilitek_tddi_ic_get_fw_ver(void)
 	} else if ( ili_ctpmodule == 2 ) {
 		sprintf(ili_version,"XLGG3_Ili_%0x",buf[3]);
 		register_tp_proc("tp",ili_version, "XLGG3",OPPO_FIRMWARE_NAME_PATH_AUOGG3);
+	} else if ( ili_ctpmodule == 3 ) {
+		sprintf(ili_version,"INXGG3_Ili_%0x",buf[3]);
+		register_tp_proc("tp",ili_version, "INXGG3",OPPO_FIRMWARE_NAME_PATH_INXG);
 	}
 #endif
 

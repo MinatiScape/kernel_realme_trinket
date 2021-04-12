@@ -5076,8 +5076,6 @@ struct afe_param_id_lpass_core_shared_clk_cfg {
 #define ADM_CMD_COPP_OPEN_TOPOLOGY_ID_AUDIOSPHERE	0x10028000
 #define VPM_TX_DM_FLUENCE_EF_COPP_TOPOLOGY		0x10000005
 
-
-
 /* Memory map regions command payload used by the
  * #ASM_CMD_SHARED_MEM_MAP_REGIONS ,#ADM_CMD_SHARED_MEM_MAP_REGIONS
  * commands.
@@ -12347,6 +12345,14 @@ struct admx_sec_primary_mic_ch {
 	uint16_t sec_primary_mic_ch;
 	uint16_t reserved1;
 } __packed;
+
+#define FFECNS_MODULE_ID                                       0x00010952
+#define FLUENCE_CMN_GLOBAL_EFFECT_PARAM_ID                     0x00010EAF
+#define FFECNS_TOPOLOGY                                        0X10028003
+
+struct ffecns_effect {
+	uint32_t payload;
+};
 
 /** ID of the Voice Activity Detection (VAD) module, which is used to
  *   configure AFE VAD.

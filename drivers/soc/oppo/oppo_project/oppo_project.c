@@ -367,7 +367,7 @@ static void dump_secure_stage(struct seq_file *s)
 
 	seq_printf(s, "%d", secure_oem_config);
 }
-
+/*
 static void update_manifest(struct proc_dir_entry *parent)
 {
 	static const char* manifest_src[2] = {
@@ -394,7 +394,7 @@ static void update_manifest(struct proc_dir_entry *parent)
 
 	set_fs(fs);
 }
-
+*/
 
 #ifdef VENDOR_EDIT
 static int __init update_feature(void)
@@ -511,7 +511,7 @@ static int _oppo_project_init(void)
 	struct proc_dir_entry *p_entry;
 	// static struct proc_dir_entry *oppo_info = NULL;
 
-	//oppo_info = proc_mkdir("oppoVersion", NULL);
+	oppo_info = proc_mkdir("oppoVersion", NULL);
 	if (!oppo_info) {
 		goto error_init;
 	}
@@ -649,10 +649,6 @@ static int __init oppo_project_init(void)
 {
 	int ret = 0;
 	struct platform_device *oppo_version_device;
-
-	oppo_info = proc_mkdir("oppoVersion", NULL);
-
-	update_manifest(oppo_info);
 
 	oppo_version_device = platform_device_alloc("oppo_version", PLATFORM_DEVID_NONE);
 	if (!oppo_version_device)

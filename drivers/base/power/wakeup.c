@@ -935,14 +935,39 @@ static void pm_print_active_wakeup_sources(void)
 	struct wakeup_source *ws;
 	int srcuidx, active = 0;
 	struct wakeup_source *last_activity_ws = NULL;
+	#ifdef VENDOR_EDIT
+    //Yongyao.Song@PSW.NW.PWR.919039, 2018/11/19, add for analysis power coumption.
+    //add for modem wake up source
+	int i = 0;
+	#endif
 
 	srcuidx = srcu_read_lock(&wakeup_srcu);
 	list_for_each_entry_rcu(ws, &wakeup_sources, entry) {
 		if (ws->active) {
+		    #ifdef VENDOR_EDIT
+            //Yongyao.Song@PSW.NW.PWR.919039,2018/11/19, add for analysis power coumption.
+            //add for modem wake up source
+			pr_info("active wakeup source: %s\n", ws->name);
+			#else
 			pr_debug("active wakeup source: %s\n", ws->name);
+			#endif
 
 			active = 1;
 
+            #ifdef VENDOR_EDIT
+            //Yongyao.Song@PSW.NW.PWR.919039, 2018/11/19, add for analysis power coumption.
+            //add for modem wake up source
+            for(i = 0; i < MODEM_WAKEUP_SRC_NUM - 1; i++)
+            {
+                if (strcmp(modem_wakeup_src_string[i], ws->name) == 0)
+                {
+                    modem_wakeup_src_count[i]++;
+                    if(i == MODEM_IPA_WS_INDEX){
+                        wakeup_source_count_modem++;
+                    }
+                }
+            }
+            #endif
 		} else if (!active &&
 			   (!last_activity_ws ||
 			    ktime_to_ns(ws->last_time) >
@@ -951,9 +976,30 @@ static void pm_print_active_wakeup_sources(void)
 		}
 	}
 
+    #ifndef VENDOR_EDIT
+    //Yongyao.Song@PSW.NW.PWR.919039, 2018/11/19, add for analysis power coumption.
+    //modify for modem wake up source
+    /*
 	if (!active && last_activity_ws)
 		pr_debug("last active wakeup source: %s\n",
 			last_activity_ws->name);
+    */
+    #else
+	if (!active && last_activity_ws){
+		pr_info("last active wakeup source: %s\n",
+			last_activity_ws->name);
+		for(i = 0; i < MODEM_WAKEUP_SRC_NUM - 1; i++)
+		{
+			if (strcmp(modem_wakeup_src_string[i], last_activity_ws->name) == 0)
+			{
+			    modem_wakeup_src_count[i]++;
+                if(i == MODEM_IPA_WS_INDEX){
+                    wakeup_source_count_modem++;
+                }
+			}
+		}
+	}
+    #endif
 	srcu_read_unlock(&wakeup_srcu, srcuidx);
 }
 EXPORT_SYMBOL_GPL(pm_print_active_wakeup_sources);
@@ -1424,8 +1470,8 @@ static ssize_t kernel_time_store(struct kobject *kobj, struct kobj_attribute *at
 {
 	char reset_string[]="reset";
 
-	if(strlen(reset_string) != (count-1))
-		return count;
+	if(!((count == strlen(reset_string)) || ((count == strlen(reset_string) + 1) && (buf[count-1] == '\n'))))
+                return count;
 
 	if (strncmp(buf, reset_string, strlen(reset_string)) != 0)
 		return count;

@@ -172,6 +172,16 @@ enum {
 	VMPRESSURE_ADJUST_NORMAL,
 };
 
+
+#ifdef VENDOR_EDIT
+/*tangshaoqing@RM.BSP.Kernel.MM 2019-03-28 modify for adaptive lowmemkill adj */
+#define ALMK_NR_PAGES_1GB (SZ_1G >> PAGE_SHIFT)
+#define ALMK_MB_to_PAGES(x) ((ALMK_NR_PAGES_1GB*(x))/1024)
+
+static unsigned int almk_swap_radio = 4;
+//module_param_named(almk_swap_radio, almk_swap_radio, uint, S_IRUGO | S_IWUSR);
+#endif
+
 static int adjust_minadj(short *min_score_adj)
 {
 	int ret = VMPRESSURE_NO_ADJUST;
@@ -187,6 +197,7 @@ static int adjust_minadj(short *min_score_adj)
 			ret = VMPRESSURE_ADJUST_NORMAL;
 		*min_score_adj = adj_max_shift;
 	}
+
 	atomic_set(&shift_adj, 0);
 
 	return ret;
@@ -517,6 +528,18 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 	int other_file;
 	bool lock_required = true;
 
+/*yulianghan@RM.BSP.Kernel.MM 2020-10-20 modify for adaptive lowmemkill adj*/
+#ifdef VENDOR_EDIT
+    int to_be_aggressive = 0;
+    long swap_pages = get_nr_swap_pages();
+
+    if (swap_pages * almk_swap_radio < total_swap_pages)
+         to_be_aggressive++;
+    if (swap_pages * (almk_swap_radio + 2) < total_swap_pages)
+         to_be_aggressive++;
+#endif
+/*yulianghan@RM.BSP.Kernel.MM 2020-10-20 modify for adaptive lowmemkill adj*/
+
 	other_free = global_zone_page_state(NR_FREE_PAGES) - totalreserve_pages;
 
 	if (global_node_page_state(NR_SHMEM) + total_swapcache_pages() +
@@ -546,6 +569,16 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 	for (i = 0; i < array_size; i++) {
 		minfree = mult_frac(lowmem_minfree[i], scale_percent, 100);
 		if (other_free < minfree && other_file < minfree) {
+/*yulianghan@RM.BSP.Kernel.MM 2020-10-20 modify for adaptive lowmemkill adj*/
+#ifdef VENDOR_EDIT
+            if (totalram_pages <= (ALMK_NR_PAGES_1GB*4)) {
+                if (to_be_aggressive != 0 && i > 2) {
+                    i -= to_be_aggressive;
+                     if (i < 2)
+                         i = 2;
+                    }
+            }
+#endif
 			min_score_adj = lowmem_adj[i];
 			break;
 		}
@@ -553,7 +586,9 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 
 	ret = adjust_minadj(&min_score_adj);
 
-	lowmem_print(3, "%s %lu, %x, ofree %d %d, ma %hd\n",
+    lowmem_print(3, "%s to_be_aggressive %d ,minfree =d% ,swap_pages =%d,total_swap_pages =%d\n",
+		     __func__, to_be_aggressive, minfree,swap_pages,total_swap_pages);
+	lowmem_print(3, "%s %lu, %x, ofree %d %d, ma %hd \n",
 		     __func__, sc->nr_to_scan, sc->gfp_mask, other_free,
 		     other_file, min_score_adj);
 
@@ -686,6 +721,7 @@ static unsigned long lowmem_scan(struct shrinker *s, struct shrink_control *sc)
 		}
 		task_unlock(selected);
 		trace_lowmemory_kill(selected, cache_size, cache_limit, free);
+
 		lowmem_print(1, "Killing '%s' (%d) (tgid %d), adj %hd,\n"
 			"to free %ldkB on behalf of '%s' (%d) because\n"
 			"cache %ldkB is below limit %ldkB for oom score %hd\n"

@@ -337,14 +337,15 @@
 			qcom,charger_lv_thr = <3400>;
 			qcom,vbatt_full_thr = <4400>;
 			qcom,vbatt_hv_thr = <4500>;
-			qcom,vfloat_step_mv = <8>;
+			/* Bin2.Zhang@ODM_WT.BSP.Charger.Basic, 2020-09-10, Modified for reduce max Vce */
+			qcom,vfloat_step_mv = <10>;
 			qcom,non_standard_vfloat_over_sw_limit = <3990>;
-			qcom,cold_vfloat_over_sw_limit = <3990>;
+			qcom,cold_vfloat_over_sw_limit = <3980>;
 			qcom,little_cold_vfloat_over_sw_limit = <4435>;
 			qcom,cool_vfloat_over_sw_limit = <4435>;
 			qcom,little_cool_vfloat_over_sw_limit = <4435>;
 			qcom,normal_vfloat_over_sw_limit = <4435>;
-			qcom,warm_vfloat_over_sw_limit = <4140>;
+			qcom,warm_vfloat_over_sw_limit = <4130>;
 
 			qcom,vbatt_power_off = <3300>;
 			qcom,vbatt_soc_1 = <3410>;
@@ -366,8 +367,9 @@
 			qcom,ffc_normal_vfloat_sw_limit = <4480>;
 			qcom,ffc_temp_normal_vfloat_mv = <4550>;
 			qcom,ffc_normal_vfloat_over_sw_limit = <4550>;
-			
-			qcom,default_iterm_ma = <250>; /*0.05C+10*/
+
+			/* Bin2.Zhang@ODM_WT.BSP.Charger.Basic, 2020-09-10, Modified for reduce max Vce */
+			qcom,default_iterm_ma = <255>; /*0.05C+10*/
 			qcom,default_temp_normal_fastchg_current_ma = <2200>;			
 			qcom,default_normal_vfloat_sw_limit = <4385>;
 			qcom,default_temp_normal_vfloat_mv = <4435>;

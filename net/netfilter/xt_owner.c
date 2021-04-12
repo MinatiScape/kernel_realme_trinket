@@ -20,7 +20,6 @@
 #include <linux/netfilter/x_tables.h>
 #include <linux/netfilter/xt_owner.h>
 
-
 static int owner_check(const struct xt_mtchk_param *par)
 {
 	struct xt_owner_match_info *info = par->matchinfo;
@@ -110,8 +109,15 @@ static struct xt_match owner_mt_reg __read_mostly = {
 	.checkentry = owner_check,
 	.match      = owner_mt,
 	.matchsize  = sizeof(struct xt_owner_match_info),
+#ifndef VENDOR_EDIT
+//Yuanhua.Du@PSW.NW.DATA.2180713, 2019/07/20, Add NF_INET_LOCAL_IN for iptables owner match rules
 	.hooks      = (1 << NF_INET_LOCAL_OUT) |
 	              (1 << NF_INET_POST_ROUTING),
+#else
+	.hooks      = (1 << NF_INET_LOCAL_OUT) |
+	              (1 << NF_INET_POST_ROUTING) |
+	              (1 << NF_INET_LOCAL_IN),
+#endif
 	.me         = THIS_MODULE,
 };
 

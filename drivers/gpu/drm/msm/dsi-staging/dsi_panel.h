@@ -231,6 +231,11 @@ struct dsi_panel {
 	bool novatek_flag;
 //Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add NT36525B HOLITECH BOE LCD bringup code
 //#endif /* ODM_WT_EDIT */
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/09/18, add ILI9881H INNOLUX INX GG3 LCD tag
+	bool ilitek_innolux_gg3_flag;
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add ILI9881H INNOLUX INX GG3 LCD tag
+//#endif /* ODM_WT_EDIT */
 	bool ulps_feature_enabled;
 	bool ulps_suspend_enabled;
 	bool allow_phy_power_off;
@@ -345,6 +350,17 @@ int dsi_panel_unprepare(struct dsi_panel *panel);
 int dsi_panel_post_unprepare(struct dsi_panel *panel);
 
 int dsi_panel_set_backlight(struct dsi_panel *panel, u32 bl_lvl);
+
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/9, add CABC cmd used for power saving
+int dsi_panel_set_cabc_mode(struct dsi_panel *panel, u32 cabc_mode);
+int dsi_panel_get_cabc_mode(struct dsi_panel *panel, unsigned int *cabc_mode);
+int dsi_panel_cabc_off_enable(struct dsi_panel *panel);
+int dsi_panel_cabc_ui_mode_enable(struct dsi_panel *panel);
+int dsi_panel_cabc_still_mode_enable(struct dsi_panel *panel);
+int dsi_panel_cabc_moving_mode_enable(struct dsi_panel *panel);
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/9, add CABC cmd used for power saving
+//#endif /* ODM_WT_EDIT */
 
 int dsi_panel_update_pps(struct dsi_panel *panel);
 

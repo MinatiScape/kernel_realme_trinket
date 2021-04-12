@@ -36,11 +36,9 @@
 
 #define INVALID_GPIO          -2
 
-extern void op_restart_modem(void);
-
-#define PAGESIZE 512
-#define SMEM_DRAM_TYPE 136
-#define MAX_CABLE_STS 4
+#define PAGESIZE             512
+#define SMEM_DRAM_TYPE       136
+#define MAX_CABLE_STS          4
 
 struct rf_info_type
 {
@@ -442,35 +440,12 @@ static int op_rf_cable_probe(struct platform_device *pdev)
     struct device_node *np = dev->of_node;
     struct rf_cable_data *rf_data = NULL;
     unsigned int len = (sizeof(struct rf_info_type) + 3)&(~0x3);
-
     struct proc_dir_entry *oppo_rf = NULL;
 
     pr_err("%s enter!\n", __func__);
 
-    pr_err("%s project:%d, operator:%d, modem:%d\n", __func__,
-        get_project(), get_Operator_Version(), get_Modem_Version());
-
-    if (get_project() == 19328) {       //19328 & 19329
-        rf_cable_0_support = true;
-
-        if (get_Operator_Version() == 15) {     //19328
-            rf_pds_0_support = true;
-            rf_pds_1_support = true;
-        }
-
-        pr_err("%s rf_cable_0_support:%d, rf_cable_1_support:%d, rf_pds_0_support:%d, rf_pds_1_support:%d, \n",
-            __func__, rf_cable_0_support, rf_cable_1_support, rf_pds_0_support, rf_pds_1_support);
-    }
-    else if (get_project() == 19321) {      //19321 & 19322 & 19323 & 19325 & 19326 & 19327
-        rf_cable_0_support = true;
-
-        pr_err("%s rf_cable_0_support:%d, rf_cable_1_support:%d, rf_pds_0_support:%d, rf_pds_1_support:%d, \n",
-            __func__, rf_cable_0_support, rf_cable_1_support, rf_pds_0_support, rf_pds_1_support);
-    }
-    else {
-        pr_err("%s exit, not supported!\n", __func__);
-        return -1;
-    }
+    rf_cable_0_support = true;
+    rf_cable_1_support = true;
 
     ret = qcom_smem_alloc(SMEM_APPS, SMEM_DRAM_TYPE, len);
     if (ret < 0 && ret != -EEXIST) {
@@ -532,18 +507,6 @@ static int op_rf_cable_probe(struct platform_device *pdev)
     if (rf_pds_0_support || rf_pds_1_support){
         proc_create("rf_pds", S_IRUGO, oppo_rf, &cable_proc_fops_pds);
     }
-
-    pr_err("%s: probe ok, rf_cable, SMEM_RF_INFO:%d, sts:%d, [0_gpio:%d, 0_val:%d], [1_gpio:%d, 1_val:%d], 0_irq:%d, 1_irq:%d\n",
-        __func__, SMEM_DRAM_TYPE, the_rf_format->rf_cable_sts,
-        rf_data->cable0_gpio, the_rf_format->rf_cable_gpio_sts[0],
-        rf_data->cable1_gpio, the_rf_format->rf_cable_gpio_sts[1],
-        rf_data->cable0_irq, rf_data->cable1_irq);
-
-    pr_err("%s: probe ok, rf_pds, SMEM_RF_INFO:%d, sts:%d, [0_gpio:%d, 0_val:%d], [1_gpio:%d, 1_val:%d], 0_irq:%d, 1_irq:%d\n",
-        __func__, SMEM_DRAM_TYPE, the_rf_format->rf_pds_sts,
-        rf_data->pds0_gpio, the_rf_format->rf_pds_gpio_sts[0],
-        rf_data->pds1_gpio, the_rf_format->rf_pds_gpio_sts[1],
-        rf_data->pds0_irq, rf_data->pds1_irq);
 
     return 0;
 

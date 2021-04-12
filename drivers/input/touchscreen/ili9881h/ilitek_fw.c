@@ -1273,6 +1273,10 @@ int ilitek_tddi_fw_upgrade(int upgrade_type, int file_type, int open_file_method
 					ilitek_tddi_fw_ili_convert_xl(pfw);
 					ipio_info("load xlgg3 panel ILI file");
 					break;
+				case 3 :
+					ilitek_tddi_fw_ili_convert_xl(pfw);
+					ipio_info("load INX GG3 panel ILI file");
+					break;
 				default:
 					ipio_info("load panel ILI file failed");
 					ili_ctpmodule = -1;

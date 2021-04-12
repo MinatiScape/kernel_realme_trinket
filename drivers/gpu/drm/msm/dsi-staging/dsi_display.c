@@ -55,8 +55,6 @@ int vid_cmd_mode_change = -1;
 extern int lcd_closebl_flag;
 /* Add for fingerprint silence*/
 extern int lcd_closebl_flag_fp;
-/* Add for ffl feature */
-extern bool oppo_ffl_trigger_finish;
 #endif
 
 #define to_dsi_display(x) container_of(x, struct dsi_display, host)
@@ -218,14 +216,6 @@ void dsi_rect_intersect(const struct dsi_rect *r1,
 	}
 }
 
-#ifdef VENDOR_EDIT
-/* Gou shengjun@PSW.MM.Display.LCD.Feature,2018-07-13
- * Add for ffl feature
- */
-extern int oppo_start_ffl_thread(void);
-extern void oppo_stop_ffl_thread(void);
-#endif /* VENDOR_EDIT */
-
 int dsi_display_set_backlight(struct drm_connector *connector,
 		void *display, u32 bl_lvl)
 {
@@ -282,19 +272,9 @@ int dsi_display_set_backlight(struct drm_connector *connector,
 			       panel->name, rc);
 			goto error;
 		}
-
-		/* Gou shengjun@PSW.MM.Display.LCD.Stable,2018-10-25 fix ffl dsi abnormal on esd scene */
-		oppo_start_ffl_thread();
 	}
 #endif /* VENDOR_EDIT */
 	panel->bl_config.bl_level = bl_lvl;
-#ifdef VENDOR_EDIT
-/* Gou shengjun@PSW.MM.Display.LCD.Feature,2018-07-12
- * Add for ffl feature
-*/
-	if (oppo_ffl_trigger_finish == false)
-		goto error;
-#endif /* VENDOR_EDIT */
 
 	/* scale backlight */
 	bl_scale = panel->bl_config.bl_scale;
@@ -341,6 +321,96 @@ error:
 	mutex_unlock(&panel->panel_lock);
 	return rc;
 }
+
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/9, add CABC cmd used for power saving
+int dsi_display_set_cabc_mode(struct drm_connector *connector,
+		void *display, u32 cabc_mode)
+{
+	struct dsi_display *dsi_display = display;
+	struct dsi_panel *panel;
+	int rc = 0;
+
+	if (dsi_display == NULL || dsi_display->panel == NULL)
+		return -EINVAL;
+
+	panel = dsi_display->panel;
+
+	mutex_lock(&panel->panel_lock);
+	if (!dsi_panel_initialized(panel)) {
+		rc = -EINVAL;
+		goto error;
+	}
+	rc = dsi_display_clk_ctrl(dsi_display->dsi_clk_handle,
+			DSI_CORE_CLK, DSI_CLK_ON);
+	if (rc) {
+		pr_err("[%s] failed to enable DSI core clocks, rc=%d\n",
+		       dsi_display->name, rc);
+		goto error;
+	}
+	rc = dsi_panel_set_cabc_mode(panel, (u32)cabc_mode);
+	if (rc) {
+		pr_err("unable to set cabc mode\n");
+		goto error;
+	}
+
+	rc = dsi_display_clk_ctrl(dsi_display->dsi_clk_handle,
+			DSI_CORE_CLK, DSI_CLK_OFF);
+	if (rc) {
+		pr_err("[%s] failed to disable DSI core clocks, rc=%d\n",
+		       dsi_display->name, rc);
+		goto error;
+	}
+
+error:
+	mutex_unlock(&panel->panel_lock);
+	return rc;
+}
+
+int dsi_display_get_cabc_mode(struct drm_connector *connector,
+		void *display, unsigned int* cabc_mode)
+{
+	struct dsi_display *dsi_display = display;
+	struct dsi_panel *panel;
+	int rc = 0;
+
+	if (dsi_display == NULL || dsi_display->panel == NULL)
+		return -EINVAL;
+
+	panel = dsi_display->panel;
+
+	mutex_lock(&panel->panel_lock);
+	if (!dsi_panel_initialized(panel)) {
+		rc = -EINVAL;
+		goto error;
+	}
+	rc = dsi_display_clk_ctrl(dsi_display->dsi_clk_handle,
+			DSI_CORE_CLK, DSI_CLK_ON);
+	if (rc) {
+		pr_err("[%s] failed to enable DSI core clocks, rc=%d\n",
+		       dsi_display->name, rc);
+		goto error;
+	}
+	rc = dsi_panel_get_cabc_mode(panel, cabc_mode);
+	if (rc) {
+		pr_err("unable to get cabc mode\n");
+		goto error;
+	}
+
+	rc = dsi_display_clk_ctrl(dsi_display->dsi_clk_handle,
+			DSI_CORE_CLK, DSI_CLK_OFF);
+	if (rc) {
+		pr_err("[%s] failed to disable DSI core clocks, rc=%d\n",
+		       dsi_display->name, rc);
+		goto error;
+	}
+
+error:
+	mutex_unlock(&panel->panel_lock);
+	return rc;
+}
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add CABC cmd used for power saving
+//#endif /* ODM_WT_EDIT */
 
 #ifndef VENDOR_EDIT
 static int dsi_display_cmd_engine_enable(struct dsi_display *display)
@@ -684,10 +754,6 @@ static bool dsi_display_validate_reg_read(struct dsi_panel *panel)
 	int len = 0, *lenp;
 	int group = 0, count = 0;
 	struct drm_panel_esd_config *config;
-#ifdef VENDOR_EDIT
-/* Gou shengjun@PSW.MM.Display.LCD.Machine, 2019/01/29,add for mm kevent fb. */
-	unsigned char payload[35] = "";
-#endif /*VENDOR_EDIT*/
 
 	if (!panel)
 		return false;
@@ -709,13 +775,6 @@ static bool dsi_display_validate_reg_read(struct dsi_panel *panel)
 				config->status_value[group + i]) {
 				DRM_ERROR("mismatch: 0x%x\n",
 					  config->return_buf[i]);
-
-#ifdef VENDOR_EDIT
-/* Gou shengjun@PSW.MM.Display.Lcd.Stability, 2018-12-04, add for solve esd fail */
-				DRM_ERROR("ESD check failed.\n");
-				scnprintf(payload, sizeof(payload), "EventID@@%d$$ESD Error is@@0x%x",OPPO_MM_DIRVER_FB_EVENT_ID_ESD,config->return_buf[i]);
-				upload_mm_kevent_fb_data(OPPO_MM_DIRVER_FB_EVENT_MODULE_DISPLAY,payload);
-#endif  /*VENDOR_EDIT*/
 
 				break;
 			}
@@ -992,15 +1051,14 @@ int dsi_display_check_status(struct drm_connector *connector, void *display,
 
 exit:
 	/* Handle Panel failures during display disable sequence */
-	if (rc <= 0)
+	if (rc <= 0) {
 		atomic_set(&panel->esd_recovery_pending, 1);
-
 //#ifdef ODM_WT_EDIT
 //Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/9, optimize lcd wakeup time
 		atomic_set(&panel->esd_recovery_flag, 1);
 //Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/9, optimize lcd wakeup time
 //#endif /* ODM_WT_EDIT */
-	
+	}
 
 release_panel_lock:
 	dsi_panel_release_panel_lock(panel);
@@ -5576,10 +5634,6 @@ static int dsi_display_init(struct dsi_display *display)
 {
 	int rc = 0;
 	struct platform_device *pdev = display->pdev;
-#ifdef VENDOR_EDIT
-/* Gou shengjun@PSW.MM.Display.LCD.Machine, 2019/02/11,add for mm kevent fb. */
-	unsigned char payload[100] = "";
-#endif /*VENDOR_EDIT*/
 
 	mutex_init(&display->display_lock);
 
@@ -5591,17 +5645,8 @@ static int dsi_display_init(struct dsi_display *display)
 
 	rc = component_add(&pdev->dev, &dsi_display_comp_ops);
 
-#ifndef VENDOR_EDIT
-/* Gou shengjun@PSW.MM.Display.LCD.Machine, 2019/02/11,add for mm kevent fb. */
 	if (rc)
 		pr_err("component add failed, rc=%d\n", rc);
-#else
-	if (rc) {
-		pr_err("component add failed, rc=%d\n", rc);
-		scnprintf(payload, sizeof(payload), "EventID@@%d$$component add error panel match fault rc=%d",OPPO_MM_DIRVER_FB_EVENT_ID_PANEL_MATCH_FAULT,rc);
-		upload_mm_kevent_fb_data(OPPO_MM_DIRVER_FB_EVENT_MODULE_DISPLAY,payload);
-	}
-#endif /*VENDOR_EDIT*/
 
 	pr_debug("component add success: %s\n", display->name);
 end:
@@ -7788,10 +7833,6 @@ int dsi_display_pre_disable(struct dsi_display *display)
 #ifdef VENDOR_EDIT
 /*Mark.Yao@PSW.MM.Display.LCD.Stable,2019-05-08 fix race on backlight and power change */
 	display->panel->need_power_on_backlight = false;
-/* Gou shengjun@PSW.MM.Display.LCD.Stable,2018-10-25
- * fix ffl dsi abnormal on esd scene
-*/
-	oppo_stop_ffl_thread();
 #endif /* VENDOR_EDIT */
 	/* enable the clk vote for CMD mode panels */
 	if (display->config.panel_mode == DSI_OP_CMD_MODE)

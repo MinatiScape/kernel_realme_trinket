@@ -336,6 +336,14 @@ enum dsi_cmd_set_type {
 	DSI_CMD_FAILSAFE_ON,
 	DSI_CMD_FAILSAFE_OFF,
 #endif
+//#ifdef ODM_WT_EDIT
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., Start 2020/03/9, add CABC cmd used for power saving
+	DSI_CMD_SET_CABC_OFF,
+	DSI_CMD_SET_CABC_UI_MODE,
+	DSI_CMD_SET_CABC_STILL_MODE,
+	DSI_CMD_SET_CABC_MOVING_MODE,
+//Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/9, add CABC cmd used for power saving
+//#endif /* ODM_WT_EDIT */
 	DSI_CMD_SET_MAX
 };
 

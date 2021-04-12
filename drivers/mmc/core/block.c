@@ -1753,8 +1753,10 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 		idata = mq_rq->drv_op_data;
 		for (i = 0, ret = 0; i < mq_rq->ioc_count; i++) {
 			ret = __mmc_blk_ioctl_cmd(card, md, idata[i]);
-			if (ret)
+			if (ret) {
+				pr_err("%s: MMC_DRV_OP_IOCTL blk_mq_end_request ret select %d\n",__func__,ret);
 				break;
+                        }
 		}
 		/* Always switch back to main area after RPMB access */
 		if (md->area_type & MMC_BLK_DATA_AREA_RPMB)
@@ -1765,6 +1767,7 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 				 card->ext_csd.boot_ro_lock |
 				 EXT_CSD_BOOT_WP_B_PWR_WP_EN,
 				 card->ext_csd.part_time);
+		pr_err("%s: MMC_DRV_OP_BOOT_WP blk_mq_end_request ret select %d\n",__func__,ret);
 		if (ret)
 			pr_err("%s: Locking boot partition ro until next power on failed: %d\n",
 			       md->disk->disk_name, ret);
@@ -1774,12 +1777,14 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 		break;
 	case MMC_DRV_OP_GET_CARD_STATUS:
 		ret = mmc_send_status(card, &status);
+		pr_err("%s: MMC_DRV_OP_GET_CARD_STATUS blk_mq_end_request ret select %d\n",__func__,ret);
 		if (!ret)
 			ret = status;
 		break;
 	case MMC_DRV_OP_GET_EXT_CSD:
 		ext_csd = mq_rq->drv_op_data;
 		ret = mmc_get_ext_csd(card, ext_csd);
+		pr_err("%s: MMC_DRV_OP_GET_EXT_CSD blk_mq_end_request ret select %d\n",__func__,ret);
 		break;
 	default:
 		pr_err("%s: unknown driver specific operation\n",
@@ -1788,6 +1793,10 @@ static void mmc_blk_issue_drv_op(struct mmc_queue *mq, struct request *req)
 		break;
 	}
 	mq_rq->drv_op_result = ret;
+
+	if(ret)
+		pr_err("%s: blk_mq_end_request ret select %d\n",__func__,(ret ? BLK_STS_IOERR : BLK_STS_OK));
+
 	blk_end_request_all(req, ret ? BLK_STS_IOERR : BLK_STS_OK);
 }
 

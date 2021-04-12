@@ -34,7 +34,8 @@
         printk(KERN_INFO "[OHM_INFO][%s]"fmt, __func__, ##__VA_ARGS__)
 #define ohm_debug_deferred(fmt, ...) \
 		printk_deferred(KERN_INFO "[OHM_INFO][%s]"fmt, __func__, ##__VA_ARGS__)
-
+#define ohm_err_deferred(fmt, ...) \
+        printk_deferred(KERN_ERR "[OHM_ERR][%s]"fmt, __func__, ##__VA_ARGS__)
 #define OHM_FLASH_TYPE_EMC 1
 #define OHM_FLASH_TYPE_UFS 2
 

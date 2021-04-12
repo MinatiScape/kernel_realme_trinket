@@ -43,6 +43,8 @@
 #endif
 
 #include "nt36xxx.h"
+#include <soc/oppo/oppo_project.h>
+
 #if NVT_TOUCH_ESD_PROTECT
 #include <linux/jiffies.h>
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
@@ -62,6 +64,8 @@
 #define FTS_UPGRADE_SKYW_FILE "skyw/NT36525B_INX_0622_HDp_PID5F1F_OPPO_V06_20190403.h"
 #define FTS_UPGRADE_HLT_FILE "hlt/NT36525B_BOE_0652_HDp_PID5F27_OPPO.h"
 
+#define FTS_20667_UPGRADE_HLTG_FILE "hltg/20667/NT36525B_BOE_0652_HDp_PID5F27_OPPO.h"
+#define FTS_20667_UPGRADE_HLT_FILE "hlt/20667/NT36525B_BOE_0652_HDp_PID5F27_OPPO.h"
 const u8 up_fw_kernel_hltg[] = {
 #include FTS_UPGRADE_HLTG_FILE
 };
@@ -74,6 +78,12 @@ const u8 up_fw_kernel_hlt[] = {
 #include FTS_UPGRADE_HLT_FILE
 };
 
+const u8 up_20667_fw_kernel_hlt[] = {
+#include FTS_20667_UPGRADE_HLT_FILE
+};
+const u8 up_20667_fw_kernel_hltg[] = {
+#include FTS_20667_UPGRADE_HLTG_FILE
+};
 //extern int get_boot_mode(void);
 //extern void devinfo_info_tp_set(char *version, char *manufacture, char *fw_path);
 
@@ -2987,6 +2997,33 @@ static int32_t __init nvt_driver_init(void)
 	int32_t ret = 0;
 
 	NVT_LOG("start\n");
+#ifdef ODM_WT_EDIT
+//Zhangbo@ODM_WT.BSP,2020/07/30,Add 20667 TP FW
+	switch(get_project()) {
+    case 19743:
+	case 19631:
+		NVT_LOG("No need to change the TP firmware path\n");
+		break;
+    case 20667:
+		NVT_LOG("Need to change the TP firmware path\n");
+		nvt_fw_list[1].firmware_name = BOOT_UPDATE_FIRMWARE_HLTG_NAME_20667;
+		nvt_fw_list[1].firmware_mp_name = MP_UPDATE_FIRMWARE_HLTG_NAME;
+		nvt_fw_list[1].firmware_sign_name = OPPO_BOOT_UPDATE_FIRMWARE_NAME_HLTG_20667;
+		nvt_fw_list[1].fw_file = up_20667_fw_kernel_hltg;
+		nvt_fw_list[1].fw_len = sizeof(up_20667_fw_kernel_hltg);
+		nvt_fw_list[0].firmware_name = BOOT_UPDATE_FIRMWARE_HLT_NAME_20667;
+		nvt_fw_list[0].firmware_mp_name = MP_UPDATE_FIRMWARE_HLT_NAME_20667;
+		nvt_fw_list[0].firmware_sign_name = OPPO_BOOT_UPDATE_FIRMWARE_NAME_HLT_20667;
+		nvt_fw_list[0].fw_file = up_20667_fw_kernel_hlt;
+		nvt_fw_list[0].fw_len = sizeof(up_20667_fw_kernel_hlt);
+		NVT_LOG("debug %s: %s\n",nvt_fw_list[1].module_vendor,nvt_fw_list[1].firmware_name);
+		NVT_LOG("debug %s: %s\n",nvt_fw_list[0].module_vendor,nvt_fw_list[0].firmware_name);
+		break;
+    default:
+		NVT_LOG("Not a designated item\n");
+		break;
+	}
+#endif
 
 	//---add spi driver---
 	ret = spi_register_driver(&nvt_spi_driver);

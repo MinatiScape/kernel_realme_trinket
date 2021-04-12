@@ -95,7 +95,8 @@ int set_oppo_display_vendor(const char * display_name) {
 			    (!strcmp(display_name, "dsi_nt36525b_hlt_boe_gg3_video_display"))) {
 		oppo_display_vendor = HLT_BOE_NT36525B_DISPALY_HDP_VIDEO_PANEL;
 		register_device_proc("lcd", "NT36525B", "hlt boe");
-	 } else if (!strcmp(display_name,"dsi_ili9881h_innolux_inx_video_display")) {
+	 } else if ((!strcmp(display_name,"dsi_ili9881h_innolux_inx_video_display")) || \
+			    (!strcmp(display_name, "dsi_ili9881h_innolux_inx_gg3_video_display"))) {
 		oppo_display_vendor = INNOLUX_INX_ILI9881H_DISPALY_HDP_VIDEO_PANEL;
 		register_device_proc("lcd", "ILI9881H", "innolux inx");
 //Hongzhu.Su@ODM_WT.MM.Display.Lcd., End 2020/03/09, add CABC cmd used for power saving
